@@ -1,7 +1,7 @@
 #define MSG_SPECIAL_CHAR_STX 0x02
 #define MSG_SPECIAL_CHAR_ETX 0x03
 #define MSG_ACK_BIT 0x40
-#define MSG_TURN_ON 0x01
+#define MSG_TURN_ON_AUTO_AIM_MODE 0x01
 #define MSG_TURN_OFF 0x00
 
 typedef enum {
@@ -10,50 +10,44 @@ typedef enum {
   MODE_CONTROL = 0x10,
   // CV hosted msgs
   ENEMY_COORDINATE = 0x20,
-} eCvInterfaceMsgTypes;
+} eCv_MsgTypes;
 
 typedef struct
 {
-  uint8_t STX;
-  uint8_t cvInterfaceMsgType;
   uint16_t targetXCoordinate;
   uint16_t targetYCoordinate;
-  uint8_t ETX;
-} tCvInterfaceTargetCoordinateMsg;
+} tCv_TargetCoordinateMsg;
 
-uint8_t RxBuffer[20];  //Initialized variable to store receive
-uint8_t TxBuffer[10];  //Initialized variable to store receive
+uint8_t rxBuffer[20];  //Initialized variable to store receive
+uint8_t txBuffer[10];  //Initialized variable to store receive
+uint8_t rxBufferWrittenSize = 0;
 
-eCvInterfaceMsgTypes cvMsgParser(uint8_t* RxBuffer);
-void cvMsgResponder(eCvInterfaceMsgTypes parsedMsgType);
+eCv_MsgTypes cvMsgHandler(uint8_t* rxBuffer);
 
 void setup() {
   Serial.begin(9600);
 }
 
 void loop() {
-  // read
+  // read from STX to ETX
   Serial.print("RECEIVER: ");
   int bytesToRead = Serial.available();
-  Serial.readBytes((char*)RxBuffer, min(bytesToRead, sizeof(RxBuffer)));
+  int bytesToBuffer = min(bytesToRead, sizeof(rxBuffer) - rxBufferWrittenSize);
+  Serial.readBytes((char*)rxBuffer[rxBufferWrittenSize], bytesToBuffer);
+  rxBufferWrittenSize += bytesToBuffer;
   if (bytesToRead != 0) {
-    Serial.println((char*)RxBuffer);
+    Serial.println((char*)rxBuffer);
   } else {
     Serial.println();
   }
 
-  // parse
-  eCvInterfaceMsgTypes parsedMsgType = cvMsgParser(RxBuffer);
-
-  // responder
-  cvMsgResponder(parsedMsgType);
+  // parse and handle
+  eCv_MsgTypes receivedMsgType = cvMsgHandler(rxBuffer);
 
   delay(1000);
 }
 
-eCvInterfaceMsgTypes cvMsgParser(uint8_t* RxBuffer) {
-  for
-}
-
-void cvMsgResponder(eCvInterfaceMsgTypes parsedMsgType) {
+eCv_MsgTypes cvMsgHandler(uint8_t* rxBuffer) {
+  uint8_t index;
+  for (index = 0; index <)
 }
