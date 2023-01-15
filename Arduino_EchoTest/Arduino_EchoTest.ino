@@ -2,8 +2,8 @@
 // mySerial is UART interface with RPi; used to emulate CV communication
 
 #include <SoftwareSerial.h>
-const byte virtualRxPin = 2;
-const byte virtualTxPin = 3;
+const byte virtualRxPin = 6;
+const byte virtualTxPin = 7;
 SoftwareSerial mySerial (virtualRxPin, virtualTxPin);
 
 char RxString[100];  // Rx Buffer
