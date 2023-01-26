@@ -4,8 +4,13 @@
 #define MSG_TURN_ON_AUTO_AIM_MODE 0x01
 #define MSG_TURN_OFF 0x00
 
+#include <SoftwareSerial.h>
+const byte virtualRxPin = 6;
+const byte virtualTxPin = 7;
+SoftwareSerial mySerial (virtualRxPin, virtualTxPin);
+
 typedef enum {
-  ERROR_MSG = 0x00,
+  ERROR_MSG = 0x0,
   // Control hosted msgs
   MODE_CONTROL = 0x10,
   // CV hosted msgs
@@ -49,5 +54,8 @@ void loop() {
 
 eCv_MsgTypes cvMsgHandler(uint8_t* rxBuffer) {
   uint8_t index;
-  for (index = 0; index <)
+  for (index = 0; index < 10;) //placeholder 
+  {
+    
+  }
 }
