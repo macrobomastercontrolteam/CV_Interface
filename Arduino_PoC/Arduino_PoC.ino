@@ -44,7 +44,7 @@ typedef union {
 
 /********* function declaration start *********/
 bool MsgReader_Heartbeat(bool *pfRxMsgComplete);
-bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool fStartCvSignal, tCoordinateHandler *pCoordinateHandler);
+bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordinateHandler *pCoordinateHandler);
 bool IsTimeout(uint32_t ulNewTime, uint32_t ulOldTime, uint32_t ulTimeout);
 /********* function declaration end *********/
 
@@ -70,10 +70,10 @@ void loop() {
   static bool fRxMsgComplete = false;
   MsgReader_Heartbeat(&fRxMsgComplete);
 
-  bool fStartCvSignal = true;                  // mock user signal that enables auto-aim mode
+  static bool fStartCvSignal = true;           // mock user signal that enables auto-aim mode
   tCoordinateHandler CoordinateHandler;        // will be used by gimbal
   CoordinateHandler.fCoordinateValid = false;  // pretend coordinate is used up by gimbal elsewhere before each loop
-  MsgHandler_Heartbeat(&fRxMsgComplete, fStartCvSignal, &CoordinateHandler);
+  MsgHandler_Heartbeat(&fRxMsgComplete, &fStartCvSignal, &CoordinateHandler);
 
   delay(1000);
 }
@@ -106,7 +106,7 @@ bool MsgReader_Heartbeat(bool *pfRxMsgComplete) {
   return *pfRxMsgComplete;
 }
 
-bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool fStartCvSignal, tCoordinateHandler *pCoordinateHandler) {
+bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordinateHandler *pCoordinateHandler) {
   typedef enum {
     HANDLER_IDLE,
     HANDLER_ENABLE_CV,
@@ -123,14 +123,14 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool fStartCvSignal, tCoordinat
   switch (HandlerState) {
     case HANDLER_IDLE:
       {
-        if (fStartCvSignal) {
+        if (*pfStartCvSignal) {
           HandlerState = HANDLER_ENABLE_CV;
         }
         break;
       }
     case HANDLER_ENABLE_CV:
       {
-        if ((fStartCvSignal == false)  // global user interrupt
+        if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
         } else {
@@ -146,7 +146,7 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool fStartCvSignal, tCoordinat
       }
     case HANDLER_WAIT_FOR_COORDINATE:
       {
-        if ((fStartCvSignal == false)  // global user interrupt
+        if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
         } else if (*pfRxMsgComplete) {
@@ -167,12 +167,14 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool fStartCvSignal, tCoordinat
         txBuffer.abPayload[0] = MODE_TURN_OFF;
         cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);
 
+        // turn off auto-aim mode; wait for user input to restart again
+        *pfStartCvSignal = false;
         HandlerState = HANDLER_IDLE;
         break;
       }
     case HANDLER_WAIT_FOR_ACK:
       {
-        if ((fStartCvSignal == false)  // global user interrupt
+        if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
         } else if (*pfRxMsgComplete) {
