@@ -50,10 +50,10 @@ bool IsTimeout(uint32_t ulNewTime, uint32_t ulOldTime, uint32_t ulTimeout);
 
 /********* module variable definitions start *********/
 // Serial is USB interface with PC; used to flash Arduino and emulate communication between CV (mocked by PC) and control (mocked by arduino)
-// cvSerial is UART interface with another arduino acting as scanner (check "Second Arduino.ino"); used to echo Rx data to scanner
+// scannerSerial is UART interface with another arduino acting as scanner (check "Second Arduino.ino"); used to echo Rx data to scanner
 const byte virtualRxPin = 6;
 const byte virtualTxPin = 7;
-SoftwareSerial cvSerial(virtualRxPin, virtualTxPin);
+SoftwareSerial scannerSerial(virtualRxPin, virtualTxPin);
 
 tMsgBuffer rxBuffer;
 tMsgBuffer txBuffer;
@@ -61,7 +61,7 @@ tMsgBuffer txBuffer;
 
 void setup() {
   Serial.begin(9600);
-  cvSerial.begin(9600);
+  scannerSerial.begin(9600);
   txBuffer.bStx = CHAR_STX;
   txBuffer.bEtx = CHAR_ETX;
 }
@@ -83,13 +83,13 @@ bool MsgReader_Heartbeat(bool *pfRxMsgComplete) {
   if (*pfRxMsgComplete == false) {
     // read from STX to ETX
     static bool fStxReceived = false;
-    if (fStxReceived || ((cvSerial.readBytes(rxBuffer.abData, 1) == 1) && (rxBuffer.bStx == CHAR_STX))) {
+    if (fStxReceived || ((Serial.readBytes(rxBuffer.abData, 1) == 1) && (rxBuffer.bStx == CHAR_STX))) {
       fStxReceived = false;
-      if (cvSerial.readBytes(&rxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) {
+      if (Serial.readBytes(&rxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) {
         if (rxBuffer.bEtx == CHAR_ETX) {
           *pfRxMsgComplete = true;
           // echo to scanner
-          Serial.write(rxBuffer.abData, DATA_PACKAGE_SIZE);
+          scannerSerial.write(rxBuffer.abData, DATA_PACKAGE_SIZE);
         } else {
           // unsynched
           for (uint8_t bDataIndex = 1; bDataIndex < DATA_PACKAGE_SIZE; bDataIndex++) {
@@ -137,8 +137,8 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool fStartCvSignal, tCoordinat
           txBuffer.bMsgType = MSG_MODE_CONTROL;
           memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE);
           txBuffer.abPayload[0] = MODE_TURN_ON_AUTO_AIM;
-          cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);
-          
+          Serial.write(txBuffer.abData, DATA_PACKAGE_SIZE);
+
           HandlerState = HANDLER_WAIT_FOR_ACK;
           NextHandlerState = HANDLER_WAIT_FOR_COORDINATE;
         }
@@ -165,7 +165,7 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool fStartCvSignal, tCoordinat
         txBuffer.bMsgType = MSG_MODE_CONTROL;
         memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE);
         txBuffer.abPayload[0] = MODE_TURN_OFF;
-        cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);
+        Serial.write(txBuffer.abData, DATA_PACKAGE_SIZE);
 
         HandlerState = HANDLER_IDLE;
         break;
