@@ -78,7 +78,7 @@ void loop() {
   MsgHandler_Heartbeat(&fRxMsgComplete, &fStartCvSignal, &CoordinateHandler); 
   //tell the handler to go
 //  Serial.print("RECEIVER: \n\t" + HandlerState.name);
-  //Serial.print("RECEIVER: \n\t");
+  Serial.print("Heartbeat: \n\t");
   delay(1000); //1 second heartbeat delay
 }
 
@@ -188,6 +188,7 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
+          Serial.println("Handler State: Disable CV from Waiting for Ack.");
         } else if (*pfRxMsgComplete) { //if valid 
           *pfRxMsgComplete = false;
           ulOldRxTimestamp = ulNewRxTimestamp; //update timestamp 
