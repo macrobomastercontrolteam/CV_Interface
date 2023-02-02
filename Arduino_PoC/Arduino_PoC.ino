@@ -1,5 +1,5 @@
 #include <SoftwareSerial.h>  // SoftwareSerial
-
+//this is control, jupiter is cv
 /********* macro start *********/
 #define TRANSMISSION_TIMEOUT 5000UL
 #define DATA_PACKAGE_SIZE 7
@@ -11,38 +11,24 @@ typedef enum {
   MSG_MODE_CONTROL = 0x10,
   MSG_COORDINATE = 0x20,
   MSG_ACK = 0x40,
-} eMsgTypes;
+} eMsgTypes; //as according to the one note
 
 typedef enum {
   CHAR_STX = 0x02,
   CHAR_ETX = 0x03,
   CHAR_UNUSED = 0xFF,
-} eCharTypes;
-
-#include <SoftwareSerial.h>
-const byte virtualRxPin = 6;
-const byte virtualTxPin = 7;
-SoftwareSerial mySerial (virtualRxPin, virtualTxPin);
+} eCharTypes; //as according to the one note
 
 typedef enum {
-<<<<<<< HEAD
-  ERROR_MSG = 0x0,
-  // Control hosted msgs
-  MODE_CONTROL = 0x10,
-  // CV hosted msgs
-  ENEMY_COORDINATE = 0x20,
-} eCv_MsgTypes;
-=======
   MODE_TURN_OFF = 0x00,
   MODE_TURN_ON_AUTO_AIM = 0x01,
-} eModeControlTypes;
->>>>>>> origin/main
+} eModeControlTypes; //as according to the one note
 
 typedef struct
 {
   uint16_t uiXCoordinate;
-  uint16_t uiYCoordinate;
-  bool fCoordinateValid;
+  uint16_t uiYCoordinate; //to store and send the XY coordinates to the board
+  bool fCoordinateValid; 
 } tCoordinateHandler;
 
 typedef union {
@@ -51,8 +37,9 @@ typedef union {
     uint8_t bMsgType;
     uint8_t abPayload[DATA_PACKAGE_PAYLOAD_SIZE];
     uint8_t bEtx;  // supposed to be CHAR_ETX
-  };
-  uint8_t abData[DATA_PACKAGE_SIZE];
+  }; //ab as in array of bytes 
+  uint8_t abData[DATA_PACKAGE_SIZE]; //defining the buffer in which you piece together
+  //the parts of the message
 } tMsgBuffer;
 /********* typedefs end *********/
 
@@ -66,7 +53,7 @@ bool IsTimeout(uint32_t ulNewTime, uint32_t ulOldTime, uint32_t ulTimeout);
 // Serial is USB interface with PC; used to flash Arduino and emulate communication between CV (mocked by PC) and control (mocked by arduino)
 // cvSerial is UART interface with another arduino acting as scanner (check "Second Arduino.ino"); used to echo Rx data to scanner
 const byte virtualRxPin = 6;
-const byte virtualTxPin = 7;
+const byte virtualTxPin = 7; //defines which pins on the board you are sending these messages through
 SoftwareSerial cvSerial(virtualRxPin, virtualTxPin);
 
 tMsgBuffer rxBuffer;
@@ -78,44 +65,40 @@ void setup() {
   cvSerial.begin(9600);
   txBuffer.bStx = CHAR_STX;
   txBuffer.bEtx = CHAR_ETX;
+  Serial.print("Setup Complete.");
 }
 
 void loop() {
   static bool fRxMsgComplete = false;
-  MsgReader_Heartbeat(&fRxMsgComplete);
+  MsgReader_Heartbeat(&fRxMsgComplete); //call the message reader
 
   static bool fStartCvSignal = true;           // mock user signal that enables auto-aim mode
   tCoordinateHandler CoordinateHandler;        // will be used by gimbal
   CoordinateHandler.fCoordinateValid = false;  // pretend coordinate is used up by gimbal elsewhere before each loop
-  MsgHandler_Heartbeat(&fRxMsgComplete, &fStartCvSignal, &CoordinateHandler);
-
-  delay(1000);
+  MsgHandler_Heartbeat(&fRxMsgComplete, &fStartCvSignal, &CoordinateHandler); 
+  //tell the handler to go
+//  Serial.print("RECEIVER: \n\t" + HandlerState.name);
+  //Serial.print("RECEIVER: \n\t");
+  delay(1000); //1 second heartbeat delay
 }
 
-<<<<<<< HEAD
-eCv_MsgTypes cvMsgHandler(uint8_t* rxBuffer) {
-  uint8_t index;
-  for (index = 0; index < 10;) //placeholder 
-  {
-    
-  }
-}
-=======
 bool MsgReader_Heartbeat(bool *pfRxMsgComplete) {
   // restart reading only after Rx Msg is processed, indicated by (*pfRxMsgComplete == false)
   if (*pfRxMsgComplete == false) {
     // read from STX to ETX
-    static bool fStxReceived = false;
+    static bool fStxReceived = false; //defined as static so this still exists even when out of scope
+    //if you recieved the stx OR ( if the number of bytes added to the rxBuffer is 1 (AKA you successfully read something) AND the stx value in the rx buffer is what you expect 
     if (fStxReceived || ((cvSerial.readBytes(rxBuffer.abData, 1) == 1) && (rxBuffer.bStx == CHAR_STX))) {
-      fStxReceived = false;
-      if (cvSerial.readBytes(&rxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) {
-        if (rxBuffer.bEtx == CHAR_ETX) {
-          *pfRxMsgComplete = true;
+      fStxReceived = false; 
+      if (cvSerial.readBytes(&rxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) { //if you successfully read the next few bytes
+        if (rxBuffer.bEtx == CHAR_ETX) { //and the ETX is correct 
+          *pfRxMsgComplete = true; //rx message is complete
           // echo to scanner
-          Serial.write(rxBuffer.abData, DATA_PACKAGE_SIZE);
+          Serial.println("sending rx data to board");
+          Serial.write(rxBuffer.abData, DATA_PACKAGE_SIZE); //write the data package to the serial port - send it to the CV 
         } else {
           // unsynched
-          for (uint8_t bDataIndex = 1; bDataIndex < DATA_PACKAGE_SIZE; bDataIndex++) {
+          for (uint8_t bDataIndex = 1; bDataIndex < DATA_PACKAGE_SIZE; bDataIndex++) { //keep iterating until you resynch
             if (rxBuffer.abData[bDataIndex] == CHAR_STX) {
               // skip checking STX on next loop
               fStxReceived = true;
@@ -136,33 +119,35 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
     HANDLER_WAIT_FOR_COORDINATE,
     HANDLER_DISABLE_CV,
     HANDLER_WAIT_FOR_ACK,
-  } tHandlerState;
-  static tHandlerState HandlerState = HANDLER_IDLE;
+  } tHandlerState; //defining handler states
+  static tHandlerState HandlerState = HANDLER_IDLE; //static/global variables to represent what state the handler is in
   static tHandlerState NextHandlerState = HANDLER_IDLE;
-  static uint32_t ulOldRxTimestamp = 0;
-  uint32_t ulNewRxTimestamp = millis();
+  static uint32_t ulOldRxTimestamp = 0; 
+  uint32_t ulNewRxTimestamp = millis(); //current time since starting the program
   bool fCoordiateReady = false;
 
   switch (HandlerState) {
     case HANDLER_IDLE:
       {
-        if (*pfStartCvSignal) {
-          HandlerState = HANDLER_ENABLE_CV;
+        if (*pfStartCvSignal) { //if you got the go signal 
+          HandlerState = HANDLER_ENABLE_CV; //go to the state that enables the computer vision
+          Serial.println("Handler State: Enable CV");
         }
         break;
       }
     case HANDLER_ENABLE_CV:
       {
-        if ((*pfStartCvSignal == false)  // global user interrupt
+        if ((*pfStartCvSignal == false)  // global user interrupt OR if its timed out 
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
-          HandlerState = HANDLER_DISABLE_CV;
-        } else {
-          txBuffer.bMsgType = MSG_MODE_CONTROL;
-          memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE);
-          txBuffer.abPayload[0] = MODE_TURN_ON_AUTO_AIM;
-          cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);
-          
-          HandlerState = HANDLER_WAIT_FOR_ACK;
+          HandlerState = HANDLER_DISABLE_CV; //disable
+          Serial.println("Handler State: Disable CV from Enable CV");
+        } else { //if valid 
+          txBuffer.bMsgType = MSG_MODE_CONTROL; //add msg to the tx bugger - 0x10
+          memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE); //set the next few spaces to the empty 0xFF
+          txBuffer.abPayload[0] = MODE_TURN_ON_AUTO_AIM;//turn on auto aim mode 0x01
+          cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);//write it to the serial - the ETX and STX have been set up in setup so dont panic 
+          Serial.println("sending data to board - enable CV");
+          HandlerState = HANDLER_WAIT_FOR_ACK; //waiting for acknowledge 
           NextHandlerState = HANDLER_WAIT_FOR_COORDINATE;
         }
         break;
@@ -172,12 +157,14 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
-        } else if (*pfRxMsgComplete) {
+          Serial.println("Handler State: Disable CV from Wait For Coordinate");
+        } else if (*pfRxMsgComplete) { //if valid and the RX message was sent
           *pfRxMsgComplete = false;
           ulOldRxTimestamp = ulNewRxTimestamp;
-          if (rxBuffer.bMsgType == MSG_COORDINATE) {
-            memcpy(pCoordinateHandler, rxBuffer.abPayload, DATA_PACKAGE_PAYLOAD_SIZE);
-            pCoordinateHandler->fCoordinateValid = true;
+          if (rxBuffer.bMsgType == MSG_COORDINATE) { //if the type is that which represents an enemy corrdinate 
+            memcpy(pCoordinateHandler, rxBuffer.abPayload, DATA_PACKAGE_PAYLOAD_SIZE); //copy the data from the rx buffer to the coordinate handler which you now created
+            pCoordinateHandler->fCoordinateValid = true; //set the coordinate valid boolean to true 
+            Serial.println("Coordinate recieved.");
             // HandlerState = ; // stay in this state until user interrupt or transmission timeout
           }
         }
@@ -185,14 +172,15 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
       }
     case HANDLER_DISABLE_CV:
       {
-        txBuffer.bMsgType = MSG_MODE_CONTROL;
-        memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE);
-        txBuffer.abPayload[0] = MODE_TURN_OFF;
-        cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);
-
+        txBuffer.bMsgType = MSG_MODE_CONTROL;//add msg to the tx bugger - 0x10
+        memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE); //set the next few spaces to the empty 0xFF
+        txBuffer.abPayload[0] = MODE_TURN_OFF; //mode is now set to turn off 0x00
+        cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE); //send the message 
+        Serial.println("Disable CV command sent.");
         // turn off auto-aim mode; wait for user input to restart again
         *pfStartCvSignal = false;
-        HandlerState = HANDLER_IDLE;
+        HandlerState = HANDLER_IDLE; 
+        Serial.println("Handler State: Idle from Disable CV.");
         break;
       }
     case HANDLER_WAIT_FOR_ACK:
@@ -200,23 +188,24 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
-        } else if (*pfRxMsgComplete) {
+        } else if (*pfRxMsgComplete) { //if valid 
           *pfRxMsgComplete = false;
-          ulOldRxTimestamp = ulNewRxTimestamp;
-          if ((rxBuffer.bMsgType == MSG_ACK)
-              && (memcmp(rxBuffer.abPayload, "ACK", sizeof("ACK")) == 0)
-              && (rxBuffer.abPayload[DATA_PACKAGE_PAYLOAD_SIZE - 1] == CHAR_UNUSED)) {
-            HandlerState = NextHandlerState;
+          ulOldRxTimestamp = ulNewRxTimestamp; //update timestamp 
+          if ((rxBuffer.bMsgType == MSG_ACK) //if this is an acknowledgement message
+              && (memcmp(rxBuffer.abPayload, "ACK", sizeof("ACK")) == 0) //and writing ack to the payload was successfull
+              && (rxBuffer.abPayload[DATA_PACKAGE_PAYLOAD_SIZE - 1] == CHAR_UNUSED)){ // and the final bit is unused 
+            Serial.println("Acknowledgement Recieved."); 
+            HandlerState = NextHandlerState; //go to next state, usually either idle or wait for coordinate  
+            Serial.println("Handler State: NextHandlerState from WaitForAck"); //needs to have live update from NextHandlerState
           }
         }
         break;
       }
   }
-  return fCoordiateReady;
+  return fCoordiateReady; 
 }
 
 bool IsTimeout(uint32_t ulNewTime, uint32_t ulOldTime, uint32_t ulTimeout) {
-  // works even with overflow
-  return ((uint32_t)(ulNewTime - ulOldTime) > ulTimeout);
+  // works even with overflow //if the time between the new (current) time and the old time is above the time out threshold 
+  return ((uint32_t)(ulNewTime - ulOldTime) > ulTimeout); 
 }
->>>>>>> origin/main
