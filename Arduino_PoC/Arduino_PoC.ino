@@ -87,7 +87,7 @@ bool MsgReader_Heartbeat(bool *pfRxMsgComplete) {
   if (*pfRxMsgComplete == false) {
     // read from STX to ETX
     static bool fStxReceived = false; //defined as static so this still exists even when out of scope
-    //if you recieved the stx OR ( if the number of bytes added to the rxBuffer is 1 (AKA you successfully read something) AND the stx value in the rx buffer is what you expect 
+    //if you recieved the stx OR ( (there's at least one byte in the rx buffer) AND (the stx value in the rx buffer is what you expect) )
     if (fStxReceived || ((cvSerial.readBytes(rxBuffer.abData, 1) == 1) && (rxBuffer.bStx == CHAR_STX))) {
       fStxReceived = false; 
       if (cvSerial.readBytes(&rxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) { //if you successfully read the next few bytes
