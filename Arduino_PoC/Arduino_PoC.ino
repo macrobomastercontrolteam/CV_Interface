@@ -140,7 +140,7 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt OR if its timed out 
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV; //disable
-          Serial.println("Handler State: Disable CV from Enable CV");
+          Serial.println("Handler State: User Abort or Timeout");
         } else { //if valid 
           txBuffer.bMsgType = MSG_MODE_CONTROL; //add msg to the tx bugger - 0x10
           memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE); //set the next few spaces to the empty 0xFF
