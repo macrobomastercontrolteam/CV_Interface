@@ -11,18 +11,18 @@ typedef enum {
   MSG_MODE_CONTROL = 0x10,
   MSG_COORDINATE = 0x20,
   MSG_ACK = 0x40,
-} eMsgTypes; //as according to the one note
+} eMsgTypes; 
 
 typedef enum {
   CHAR_STX = 0x02,
   CHAR_ETX = 0x03,
   CHAR_UNUSED = 0xFF,
-} eCharTypes; //as according to the one note
+} eCharTypes; 
 
 typedef enum {
   MODE_TURN_OFF = 0x00,
   MODE_TURN_ON_AUTO_AIM = 0x01,
-} eModeControlTypes; //as according to the one note
+} eModeControlTypes; 
 
 typedef struct
 {
@@ -75,9 +75,7 @@ void loop() {
   static bool fStartCvSignal = true;           // mock user signal that enables auto-aim mode
   tCoordinateHandler CoordinateHandler;        // will be used by gimbal
   CoordinateHandler.fCoordinateValid = false;  // pretend coordinate is used up by gimbal elsewhere before each loop
-  MsgHandler_Heartbeat(&fRxMsgComplete, &fStartCvSignal, &CoordinateHandler); 
-  //tell the handler to go
-//  Serial.print("RECEIVER: \n\t" + HandlerState.name);
+  MsgReader_Heartbeat(&fRxMsgComplete); 
   Serial.print("Heartbeat: \n\t");
   delay(1000); //1 second heartbeat delay
 }
@@ -120,18 +118,18 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
     HANDLER_DISABLE_CV,
     HANDLER_WAIT_FOR_ACK,
   } tHandlerState; //defining handler states
-  static tHandlerState HandlerState = HANDLER_IDLE; //static/global variables to represent what state the handler is in
+  static tHandlerState HandlerState = HANDLER_IDLE; //static variables to represent what state the handler is in
   static tHandlerState NextHandlerState = HANDLER_IDLE;
   static uint32_t ulOldRxTimestamp = 0; 
   uint32_t ulNewRxTimestamp = millis(); //current time since starting the program
   bool fCoordiateReady = false;
 
+  Serial.println("Handler State: " + HandlerState);
   switch (HandlerState) {
     case HANDLER_IDLE:
       {
         if (*pfStartCvSignal) { //if you got the go signal 
           HandlerState = HANDLER_ENABLE_CV; //go to the state that enables the computer vision
-          Serial.println("Handler State: Enable CV");
         }
         break;
       }
@@ -140,13 +138,11 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt OR if its timed out 
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV; //disable
-          Serial.println("Handler State: User Abort or Timeout");
         } else { //if valid 
           txBuffer.bMsgType = MSG_MODE_CONTROL; //add msg to the tx bugger - 0x10
           memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE); //set the next few spaces to the empty 0xFF
           txBuffer.abPayload[0] = MODE_TURN_ON_AUTO_AIM;//turn on auto aim mode 0x01
           cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);//write it to the serial - the ETX and STX have been set up in setup so dont panic 
-          Serial.println("sending data to board - enable CV");
           HandlerState = HANDLER_WAIT_FOR_ACK; //waiting for acknowledge 
           NextHandlerState = HANDLER_WAIT_FOR_COORDINATE;
         }
@@ -157,7 +153,6 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
-          Serial.println("Handler State: Disable CV from Wait For Coordinate");
         } else if (*pfRxMsgComplete) { //if valid and the RX message was sent
           *pfRxMsgComplete = false;
           ulOldRxTimestamp = ulNewRxTimestamp;
@@ -180,7 +175,6 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         // turn off auto-aim mode; wait for user input to restart again
         *pfStartCvSignal = false;
         HandlerState = HANDLER_IDLE; 
-        Serial.println("Handler State: Idle from Disable CV.");
         break;
       }
     case HANDLER_WAIT_FOR_ACK:
@@ -188,7 +182,6 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
-          Serial.println("Handler State: User Abort or Timeout");
         } else if (*pfRxMsgComplete) { //if valid 
           *pfRxMsgComplete = false;
           ulOldRxTimestamp = ulNewRxTimestamp; //update timestamp 
@@ -197,7 +190,6 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
               && (rxBuffer.abPayload[DATA_PACKAGE_PAYLOAD_SIZE - 1] == CHAR_UNUSED)){ // and the final bit is unused 
             Serial.println("Acknowledgement Recieved."); 
             HandlerState = NextHandlerState; //go to next state, usually either idle or wait for coordinate  
-            Serial.println("Handler State: NextHandlerState from WaitForAck"); //needs to have live update from NextHandlerState
           }
         }
         break;
