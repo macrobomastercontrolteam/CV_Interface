@@ -188,7 +188,7 @@ bool MsgHandler_Heartbeat(bool *pfRxMsgComplete, bool *pfStartCvSignal, tCoordin
         if ((*pfStartCvSignal == false)  // global user interrupt
             || IsTimeout(ulNewRxTimestamp, ulOldRxTimestamp, TRANSMISSION_TIMEOUT)) {
           HandlerState = HANDLER_DISABLE_CV;
-          Serial.println("Handler State: Disable CV from Waiting for Ack.");
+          Serial.println("Handler State: User Abort or Timeout");
         } else if (*pfRxMsgComplete) { //if valid 
           *pfRxMsgComplete = false;
           ulOldRxTimestamp = ulNewRxTimestamp; //update timestamp 
