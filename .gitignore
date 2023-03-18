@@ -1,1 +1,15 @@
 .ipynb_checkpoints/
+build/compile_commands.json
+*.cache
+*.eep
+*.hex
+*.bin
+*.d
+*.elf
+*.o
+build/build.options.json
+build/preproc/ctags_target_for_gcc_minus_e.cpp
+build/sketch/Test_Arduino.ino.cpp
+.vscode/arduino.json
+Two_Arduinos/Test_Arduino/.theia/launch.json
+.vscode/c_cpp_properties.json
