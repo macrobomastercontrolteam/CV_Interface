@@ -79,11 +79,11 @@ const byte virtualTxPin = 7;  // defines which pins on the board you are sending
 SoftwareSerial virtualSerial(virtualRxPin, virtualTxPin);
 
 #if defined(ARDUINO_RPI_SETUP)
-SoftwareSerial cvSerial = virtualSerial;
-HardwareSerial scannerSerial = Serial;
+#define cvSerial virtualSerial
+#define scannerSerial Serial
 #elif defined(TWO_ARDUINO_SETUP)
-HardwareSerial cvSerial = Serial;
-SoftwareSerial scannerSerial = virtualSerial;
+#define cvSerial Serial
+#define scannerSerial virtualSerial
 #endif
 
 const int buttonPin = 2;
@@ -111,24 +111,23 @@ void loop() {
       case 0:
         {
           CvCmdHandler.fCvMode = MODE_ENEMY_DETECTED_BIT;
-          scannerSerial.println("Sent: enemy");
+          // scannerSerial.println("Sent: enemy");
           break;
         }
       case 1:
         {
           CvCmdHandler.fCvMode = MODE_AUTO_MOVE_BIT | MODE_ENEMY_DETECTED_BIT;
-          scannerSerial.println("Sent: move | enemy");
+          // scannerSerial.println("Sent: move | enemy");
           break;
         }
       case 2:
         {
           CvCmdHandler.fCvMode = MODE_AUTO_AIM_BIT | MODE_AUTO_MOVE_BIT | MODE_ENEMY_DETECTED_BIT;
-          scannerSerial.println("Sent: all");
+          // scannerSerial.println("Sent: all");
           break;
         }
     }
     bMockCounter = (bMockCounter + 1) % 3;
-    scannerSerial.flush();
     MsgTxHandler_SendSetModeRequest(&CvCmdHandler);
   }
 
@@ -167,7 +166,7 @@ void MsgRxHandler_ReaderHeartbeat(tCvCmdHandler *pCvCmdHandler) {
 void MsgRxHandler_Parser(tCvCmdHandler *pCvCmdHandler) {
   if (pCvCmdHandler->fRxMsgComplete) {
     pCvCmdHandler->fRxMsgComplete = false;
-    scannerSerial.println("Received msg: " + rxBuffer.bMsgType);
+    // scannerSerial.println("Received msg: " + rxBuffer.bMsgType);
 
     bool fInvalid = false;
     uint8_t bDataCursor;
@@ -223,20 +222,17 @@ void MsgRxHandler_Parser(tCvCmdHandler *pCvCmdHandler) {
 
     // ignore invalid msg
     if (fInvalid) {
-      scannerSerial.println("Ignored msg: " + rxBuffer.bMsgType);
+      // scannerSerial.println("Ignored msg: " + rxBuffer.bMsgType);
     }
   }
 }
 
 void MsgTxHandler_SendSetModeRequest(tCvCmdHandler *pCvCmdHandler) {
-  if (cvSerial.availableForWrite() < DATA_PACKAGE_SIZE) {
-    scannerSerial.println("flushing");
-    cvSerial.flush();
-  }
   txBuffer.bMsgType = MSG_MODE_CONTROL;                                // add msg to the tx bugger - 0x10
   memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE);  // set the next few spaces to the empty 0xFF
   txBuffer.abPayload[0] = CvCmdHandler.fCvMode;                        // turn on auto aim mode 0x01
   cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);                  // write it to the scannerSerial - the ETX and STX have been set up in setup so dont panic
+  scannerSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);             // echo to scanner
 
   pCvCmdHandler->fCvCmdValid = pCvCmdHandler->fCvCmdValid && (IsCvModeOn(MODE_AUTO_MOVE_BIT) || IsCvModeOn(MODE_AUTO_AIM_BIT));
   pCvCmdHandler->fIsWaitingForAck = true;
