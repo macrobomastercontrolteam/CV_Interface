@@ -110,24 +110,30 @@ void loop() {
     switch (bMockCounter) {
       case 0:
         {
-          CvCmdHandler.fCvMode = MODE_ENEMY_DETECTED_BIT;
+          CvCmdHandler.fCvMode = 0;
           // scannerSerial.println("Sent: enemy");
           break;
         }
       case 1:
         {
+          CvCmdHandler.fCvMode = MODE_ENEMY_DETECTED_BIT;
+          // scannerSerial.println("Sent: enemy");
+          break;
+        }
+      case 2:
+        {
           CvCmdHandler.fCvMode = MODE_AUTO_MOVE_BIT | MODE_ENEMY_DETECTED_BIT;
           // scannerSerial.println("Sent: move | enemy");
           break;
         }
-      case 2:
+      case 3:
         {
           CvCmdHandler.fCvMode = MODE_AUTO_AIM_BIT | MODE_AUTO_MOVE_BIT | MODE_ENEMY_DETECTED_BIT;
           // scannerSerial.println("Sent: all");
           break;
         }
     }
-    bMockCounter = (bMockCounter + 1) % 3;
+    bMockCounter = (bMockCounter + 1) % 4;
     MsgTxHandler_SendSetModeRequest(&CvCmdHandler);
   }
 
