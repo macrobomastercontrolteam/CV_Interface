@@ -1,5 +1,6 @@
 //Receiver Arduino Board Code
 char RxString[100];  //Initialized variable to store receive
+uint8_t RxChar;
 
 void setup() {
   Serial.begin(9600);
@@ -14,15 +15,13 @@ void loop() {
   {
     Serial.println("RECEIVER: ");
     for (int i = 0; i < bytestoread; i++) {
-      Serial.print(RxString[i]);
-      // Serial.print("\t0x");
-      // // RxString cannnot handle 0xFF, since it's char array
-      // if (RxString[i] == -1) {
-      //   Serial.print("FF");
-      // } else {
-      //   Serial.print(RxString[i], HEX);
-      // }
-      // Serial.print('\n');
+      // // Print by ASCII
+      // Serial.print(RxString[i]);
+
+      RxChar = RxString[i];
+      Serial.print("\t0x");
+      Serial.print(RxChar, HEX);
+      Serial.print('\n');
     }
   }
   delay(1000);
