@@ -44,7 +44,7 @@ typedef struct
 typedef struct
 {
   tCvCmdMsg CvCmdMsg;
-  bool fCvCmdValid;  ///< whether CvCmdMsg is valid as received from CV
+  bool fCvCmdValid;  ///< whether CvCmdMsg is valid as received from CV; to be used by gimbal_task
   bool fRxMsgComplete;
   bool fIsWaitingForAck;
   bool fIsStxReceived;
