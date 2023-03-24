@@ -1,6 +1,8 @@
 # CV_Interface
 Communication API for CV to use
 
+CV requirement for python version: 3.6.9
+
 Different but equivalent bench setups
 - TWO_ARDUINO_SETUP
     - Two arduinos connected to each other and also computer
