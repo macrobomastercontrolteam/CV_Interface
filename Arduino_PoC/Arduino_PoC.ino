@@ -91,6 +91,9 @@ const int buttonPin = 2;
 tMsgBuffer rxBuffer;
 tMsgBuffer txBuffer;
 tCvCmdHandler CvCmdHandler;
+// don't compare with "ACK", since it contains extra NULL char at the end
+const uint8_t abExpectedAckPayload[3] = { 'A', 'C', 'K' };
+uint8_t abExpectedUnusedPayload[DATA_PACKAGE_PAYLOAD_SIZE];
 /********* module variable definitions end *********/
 
 void setup() {
@@ -101,6 +104,7 @@ void setup() {
   pinMode(buttonPin, INPUT);
 
   memset(&CvCmdHandler, 0, sizeof(CvCmdHandler));  // clear status
+  memset(abExpectedUnusedPayload, CHAR_UNUSED, sizeof(abExpectedUnusedPayload));
 }
 
 void loop() {
@@ -151,8 +155,6 @@ void MsgRxHandler_ReaderHeartbeat(tCvCmdHandler *pCvCmdHandler) {
       pCvCmdHandler->fIsStxReceived = false;
       if (cvSerial.readBytes(&rxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) {  // if you successfully read the next few bytes
         if (rxBuffer.bEtx == CHAR_ETX) {                                                              // and the ETX is correct
-          // echo to scanner
-          scannerSerial.write(rxBuffer.abData, DATA_PACKAGE_SIZE);
           pCvCmdHandler->fRxMsgComplete = true;
         } else {
           // unsynched
@@ -179,22 +181,12 @@ void MsgRxHandler_Parser(tCvCmdHandler *pCvCmdHandler) {
     switch (rxBuffer.bMsgType) {
       case MSG_CV_CMD:
         {
-          if (((IsCvModeOn(MODE_AUTO_MOVE_BIT) || IsCvModeOn(MODE_AUTO_AIM_BIT)) == false)
-              // must wait until ACK to start CV control
-              || (pCvCmdHandler->fIsWaitingForAck == false)) {
-            fInvalid = true;
-          } else {
-            for (bDataCursor = sizeof(tCvCmdMsg); bDataCursor < DATA_PACKAGE_PAYLOAD_SIZE; bDataCursor++) {
-              if (rxBuffer.abPayload[bDataCursor] != CHAR_UNUSED) {
-                fInvalid = true;
-                break;
-              }
-            }
-          }
+          fInvalid |= ((IsCvModeOn(MODE_AUTO_MOVE_BIT) == false) && (IsCvModeOn(MODE_AUTO_AIM_BIT) == false));
+          fInvalid |= pCvCmdHandler->fIsWaitingForAck;
+          fInvalid |= (memcmp(&rxBuffer.abPayload[sizeof(tCvCmdMsg)], abExpectedUnusedPayload, DATA_PACKAGE_PAYLOAD_SIZE - sizeof(tCvCmdMsg)) != 0);
 
           if (fInvalid == false) {
             memcpy(&(pCvCmdHandler->CvCmdMsg), rxBuffer.abPayload, sizeof(pCvCmdHandler->CvCmdMsg));
-            // to be used by gimbal_task
             pCvCmdHandler->fCvCmdValid = true;
           } else {
             pCvCmdHandler->fCvCmdValid = false;
@@ -203,19 +195,10 @@ void MsgRxHandler_Parser(tCvCmdHandler *pCvCmdHandler) {
         }
       case MSG_ACK:
         {
-          for (bDataCursor = sizeof("ACK"); bDataCursor < DATA_PACKAGE_PAYLOAD_SIZE; bDataCursor++) {
-            if (rxBuffer.abPayload[bDataCursor] != CHAR_UNUSED) {
-              fInvalid = true;
-              break;
-            }
-          }
-
+          fInvalid |= (memcmp(&rxBuffer.abPayload[sizeof(abExpectedAckPayload)], abExpectedUnusedPayload, DATA_PACKAGE_PAYLOAD_SIZE - sizeof(abExpectedAckPayload)) != 0);
+          fInvalid |= (memcmp(rxBuffer.abPayload, abExpectedAckPayload, sizeof(abExpectedAckPayload)) != 0);
           if (fInvalid == false) {
-            if (memcmp(rxBuffer.abPayload, "ACK", sizeof("ACK")) == 0) {
-              pCvCmdHandler->fIsWaitingForAck = false;
-            } else {
-              fInvalid = true;
-            }
+            pCvCmdHandler->fIsWaitingForAck = false;
           }
           break;
         }
@@ -229,6 +212,9 @@ void MsgRxHandler_Parser(tCvCmdHandler *pCvCmdHandler) {
     // ignore invalid msg
     if (fInvalid) {
       // scannerSerial.println("Ignored msg: " + rxBuffer.bMsgType);
+    } else {
+      // echo to scanner
+      scannerSerial.write(rxBuffer.abData, DATA_PACKAGE_SIZE);
     }
   }
 }
