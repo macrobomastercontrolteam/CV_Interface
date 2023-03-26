@@ -25,9 +25,9 @@ typedef enum {
 } eCharTypes;
 
 typedef enum {
-  MODE_AUTO_AIM_BIT = 0b00000001,
-  MODE_AUTO_MOVE_BIT = 0b00000010,
-  MODE_ENEMY_DETECTED_BIT = 0b00000100,
+  CV_MODE_AUTO_AIM_BIT = 0b00000001,
+  CV_MODE_AUTO_MOVE_BIT = 0b00000010,
+  CV_MODE_ENEMY_DETECTED_BIT = 0b00000100,
 } eModeControlBits;
 
 typedef struct
@@ -44,10 +44,10 @@ typedef struct
 typedef struct
 {
   tCvCmdMsg CvCmdMsg;
-  bool fCvCmdValid;  ///< whether CvCmdMsg is valid as received from CV; to be used by gimbal_task
-  bool fRxMsgComplete;
-  bool fIsWaitingForAck;
-  bool fIsStxReceived;
+  uint8_t fCvCmdValid;  ///< whether CvCmdMsg is valid as received from CV; to be used by gimbal_task
+  uint8_t fRxMsgReceived;
+  uint8_t fIsWaitingForAck;
+  uint8_t fIsStxReceived;
   uint8_t fCvMode;  ///< contains individual CV control flag bits defined by eModeControlBits
 } tCvCmdHandler;
 
@@ -61,16 +61,16 @@ typedef union {
     uint8_t bMsgType;
     uint8_t abPayload[DATA_PACKAGE_PAYLOAD_SIZE];
     uint8_t bEtx;  ///< supposed to be CHAR_ETX in actual msg
-  };
+  } tData;
   uint8_t abData[DATA_PACKAGE_SIZE];
-} tMsgBuffer;
+} tCvMsg;
 /********* typedefs end *********/
 
 /********* function declaration start *********/
-void MsgRxHandler_ReaderHeartbeat(tCvCmdHandler *pCvCmdHandler);
-void MsgRxHandler_Parser(tCvCmdHandler *pCvCmdHandler);
-void MsgTxHandler_SendSetModeRequest(tCvCmdHandler *pCvCmdHandler);
-bool IsCvModeOn(uint8_t bCvModeBit);
+void MsgRxHandler_ReaderHeartbeat(void);
+void MsgRxHandler_Parser(void);
+void MsgTxHandler_SendSetModeRequest(void);
+uint8_t IsCvModeOn(uint8_t bCvModeBit);
 /********* function declaration end *********/
 
 /********* module variable definitions start *********/
@@ -88,19 +88,19 @@ SoftwareSerial virtualSerial(virtualRxPin, virtualTxPin);
 
 const int buttonPin = 2;
 
-tMsgBuffer rxBuffer;
-tMsgBuffer txBuffer;
+tCvMsg CvRxBuffer;
+tCvMsg CvTxBuffer;
 tCvCmdHandler CvCmdHandler;
 // don't compare with "ACK", since it contains extra NULL char at the end
 const uint8_t abExpectedAckPayload[3] = { 'A', 'C', 'K' };
-uint8_t abExpectedUnusedPayload[DATA_PACKAGE_PAYLOAD_SIZE];
+uint8_t abExpectedUnusedPayload[DATA_PACKAGE_PAYLOAD_SIZE - 1];
 /********* module variable definitions end *********/
 
 void setup() {
-  scannerSerial.begin(9600);
-  cvSerial.begin(9600);
-  txBuffer.bStx = CHAR_STX;
-  txBuffer.bEtx = CHAR_ETX;
+  scannerSerial.begin(115200);
+  cvSerial.begin(115200);
+  CvTxBuffer.tData.bStx = CHAR_STX;
+  CvTxBuffer.tData.bEtx = CHAR_ETX;
   pinMode(buttonPin, INPUT);
 
   memset(&CvCmdHandler, 0, sizeof(CvCmdHandler));  // clear status
@@ -120,48 +120,48 @@ void loop() {
         }
       case 1:
         {
-          CvCmdHandler.fCvMode = MODE_ENEMY_DETECTED_BIT;
+          CvCmdHandler.fCvMode = CV_MODE_ENEMY_DETECTED_BIT;
           // scannerSerial.println("Sent: enemy");
           break;
         }
       case 2:
         {
-          CvCmdHandler.fCvMode = MODE_AUTO_MOVE_BIT | MODE_ENEMY_DETECTED_BIT;
+          CvCmdHandler.fCvMode = CV_MODE_AUTO_MOVE_BIT | CV_MODE_ENEMY_DETECTED_BIT;
           // scannerSerial.println("Sent: move | enemy");
           break;
         }
       case 3:
         {
-          CvCmdHandler.fCvMode = MODE_AUTO_AIM_BIT | MODE_AUTO_MOVE_BIT | MODE_ENEMY_DETECTED_BIT;
+          CvCmdHandler.fCvMode = CV_MODE_AUTO_AIM_BIT | CV_MODE_AUTO_MOVE_BIT | CV_MODE_ENEMY_DETECTED_BIT;
           // scannerSerial.println("Sent: all");
           break;
         }
     }
     bMockCounter = (bMockCounter + 1) % 4;
-    MsgTxHandler_SendSetModeRequest(&CvCmdHandler);
+    MsgTxHandler_SendSetModeRequest();
   }
 
-  MsgRxHandler_ReaderHeartbeat(&CvCmdHandler);
-  MsgRxHandler_Parser(&CvCmdHandler);
+  MsgRxHandler_ReaderHeartbeat();
+  MsgRxHandler_Parser();
   delay(100);
 }
 
-void MsgRxHandler_ReaderHeartbeat(tCvCmdHandler *pCvCmdHandler) {
-  // restart reading only after Rx Msg is processed, indicated by (*pfRxMsgComplete == false)
-  if (pCvCmdHandler->fRxMsgComplete == false) {
+void MsgRxHandler_ReaderHeartbeat(void) {
+  // restart reading only after Rx Msg is processed, indicated by (*pfRxMsgReceived == 0)
+  if (CvCmdHandler.fRxMsgReceived == 0) {
     // read from STX to ETX
     // if you recieved the stx OR ( (there's at least one byte in the rx buffer) AND (the stx value in the rx buffer is what you expect) )
-    if (pCvCmdHandler->fIsStxReceived || ((cvSerial.readBytes(rxBuffer.abData, 1) == 1) && (rxBuffer.bStx == CHAR_STX))) {
-      pCvCmdHandler->fIsStxReceived = false;
-      if (cvSerial.readBytes(&rxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) {  // if you successfully read the next few bytes
-        if (rxBuffer.bEtx == CHAR_ETX) {                                                              // and the ETX is correct
-          pCvCmdHandler->fRxMsgComplete = true;
+    if (CvCmdHandler.fIsStxReceived || ((cvSerial.readBytes(CvRxBuffer.abData, 1) == 1) && (CvRxBuffer.tData.bStx == CHAR_STX))) {
+      CvCmdHandler.fIsStxReceived = 0;
+      if (cvSerial.readBytes(&CvRxBuffer.abData[1], DATA_PACKAGE_SIZE - 1) == DATA_PACKAGE_SIZE - 1) {  // if you successfully read the next few bytes
+        if (CvRxBuffer.tData.bEtx == CHAR_ETX) {                                                        // and the ETX is correct
+          CvCmdHandler.fRxMsgReceived = 1;
         } else {
           // unsynched
           for (uint8_t bDataIndex = 1; bDataIndex < DATA_PACKAGE_SIZE; bDataIndex++) {  // keep iterating until you resynch
-            if (rxBuffer.abData[bDataIndex] == CHAR_STX) {
+            if (CvRxBuffer.abData[bDataIndex] == CHAR_STX) {
               // skip checking STX on next loop
-              pCvCmdHandler->fIsStxReceived = true;
+              CvCmdHandler.fIsStxReceived = 1;
               break;
             }
           }
@@ -171,65 +171,64 @@ void MsgRxHandler_ReaderHeartbeat(tCvCmdHandler *pCvCmdHandler) {
   }
 }
 
-void MsgRxHandler_Parser(tCvCmdHandler *pCvCmdHandler) {
-  if (pCvCmdHandler->fRxMsgComplete) {
-    pCvCmdHandler->fRxMsgComplete = false;
-    // scannerSerial.println("Received msg: " + rxBuffer.bMsgType);
+void MsgRxHandler_Parser(void) {
+  if (CvCmdHandler.fRxMsgReceived) {
+    CvCmdHandler.fRxMsgReceived = 0;
+    // scannerSerial.println("Received msg: " + CvRxBuffer.tData.bMsgType);
 
-    bool fInvalid = false;
-    uint8_t bDataCursor;
-    switch (rxBuffer.bMsgType) {
+    uint8_t fInvalid = 0;
+    switch (CvRxBuffer.tData.bMsgType) {
       case MSG_CV_CMD:
         {
-          fInvalid |= ((IsCvModeOn(MODE_AUTO_MOVE_BIT) == false) && (IsCvModeOn(MODE_AUTO_AIM_BIT) == false));
-          fInvalid |= pCvCmdHandler->fIsWaitingForAck;
-          fInvalid |= (memcmp(&rxBuffer.abPayload[sizeof(tCvCmdMsg)], abExpectedUnusedPayload, DATA_PACKAGE_PAYLOAD_SIZE - sizeof(tCvCmdMsg)) != 0);
+          fInvalid |= ((IsCvModeOn(CV_MODE_AUTO_MOVE_BIT) == 0) && (IsCvModeOn(CV_MODE_AUTO_AIM_BIT) == 0));
+          fInvalid |= CvCmdHandler.fIsWaitingForAck;
+          fInvalid |= (memcmp(&CvRxBuffer.tData.abPayload[sizeof(tCvCmdMsg)], abExpectedUnusedPayload, DATA_PACKAGE_PAYLOAD_SIZE - sizeof(tCvCmdMsg)) != 0);
 
-          if (fInvalid == false) {
-            memcpy(&(pCvCmdHandler->CvCmdMsg), rxBuffer.abPayload, sizeof(pCvCmdHandler->CvCmdMsg));
-            pCvCmdHandler->fCvCmdValid = true;
+          if (fInvalid == 0) {
+            memcpy(&(CvCmdHandler.CvCmdMsg), CvRxBuffer.tData.abPayload, sizeof(CvCmdHandler.CvCmdMsg));
+            CvCmdHandler.fCvCmdValid = 1;
           } else {
-            pCvCmdHandler->fCvCmdValid = false;
+            CvCmdHandler.fCvCmdValid = 0;
           }
           break;
         }
       case MSG_ACK:
         {
-          fInvalid |= (memcmp(&rxBuffer.abPayload[sizeof(abExpectedAckPayload)], abExpectedUnusedPayload, DATA_PACKAGE_PAYLOAD_SIZE - sizeof(abExpectedAckPayload)) != 0);
-          fInvalid |= (memcmp(rxBuffer.abPayload, abExpectedAckPayload, sizeof(abExpectedAckPayload)) != 0);
-          if (fInvalid == false) {
-            pCvCmdHandler->fIsWaitingForAck = false;
+          fInvalid |= (memcmp(&CvRxBuffer.tData.abPayload[sizeof(abExpectedAckPayload)], abExpectedUnusedPayload, DATA_PACKAGE_PAYLOAD_SIZE - sizeof(abExpectedAckPayload)) != 0);
+          fInvalid |= (memcmp(CvRxBuffer.tData.abPayload, abExpectedAckPayload, sizeof(abExpectedAckPayload)) != 0);
+          if (fInvalid == 0) {
+            CvCmdHandler.fIsWaitingForAck = 0;
           }
           break;
         }
       default:
         {
-          fInvalid = true;
+          fInvalid = 1;
           break;
         }
     }
 
     // ignore invalid msg
     if (fInvalid) {
-      // scannerSerial.println("Ignored msg: " + rxBuffer.bMsgType);
+      // scannerSerial.println("Ignored msg: " + CvRxBuffer.tData.bMsgType);
     } else {
       // echo to scanner
-      scannerSerial.write(rxBuffer.abData, DATA_PACKAGE_SIZE);
+      scannerSerial.write(CvRxBuffer.abData, DATA_PACKAGE_SIZE);
     }
   }
 }
 
-void MsgTxHandler_SendSetModeRequest(tCvCmdHandler *pCvCmdHandler) {
-  txBuffer.bMsgType = MSG_MODE_CONTROL;                                // add msg to the tx bugger - 0x10
-  memset(txBuffer.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE);  // set the next few spaces to the empty 0xFF
-  txBuffer.abPayload[0] = CvCmdHandler.fCvMode;                        // turn on auto aim mode 0x01
-  cvSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);                  // write it to the scannerSerial - the ETX and STX have been set up in setup so dont panic
-  scannerSerial.write(txBuffer.abData, DATA_PACKAGE_SIZE);             // echo to scanner
+void MsgTxHandler_SendSetModeRequest(void) {
+  CvTxBuffer.tData.bMsgType = MSG_MODE_CONTROL;                                // add msg to the tx bugger - 0x10
+  memset(CvTxBuffer.tData.abPayload, CHAR_UNUSED, DATA_PACKAGE_PAYLOAD_SIZE);  // set the next few spaces to the empty 0xFF
+  CvTxBuffer.tData.abPayload[0] = CvCmdHandler.fCvMode;                        // turn on auto aim mode 0x01
+  cvSerial.write(CvTxBuffer.abData, DATA_PACKAGE_SIZE);                        // write it to the scannerSerial - the ETX and STX have been set up in setup so dont panic
+  scannerSerial.write(CvTxBuffer.abData, DATA_PACKAGE_SIZE);                   // echo to scanner
 
-  pCvCmdHandler->fCvCmdValid = pCvCmdHandler->fCvCmdValid && (IsCvModeOn(MODE_AUTO_MOVE_BIT) || IsCvModeOn(MODE_AUTO_AIM_BIT));
-  pCvCmdHandler->fIsWaitingForAck = true;
+  CvCmdHandler.fCvCmdValid = CvCmdHandler.fCvCmdValid && (IsCvModeOn(CV_MODE_AUTO_MOVE_BIT) || IsCvModeOn(CV_MODE_AUTO_AIM_BIT));
+  CvCmdHandler.fIsWaitingForAck = 1;
 }
 
-bool IsCvModeOn(uint8_t bCvModeBit) {
+uint8_t IsCvModeOn(uint8_t bCvModeBit) {
   return (CvCmdHandler.fCvMode & bCvModeBit);
 }
