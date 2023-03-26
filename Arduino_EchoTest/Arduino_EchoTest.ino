@@ -9,8 +9,8 @@ SoftwareSerial cvSerial(virtualRxPin, virtualTxPin);
 char RxString[100];  // Rx Buffer
 
 void setup() {
-  Serial.begin(9600);
-  cvSerial.begin(9600);
+  Serial.begin(115200);
+  cvSerial.begin(115200);
   while (!Serial) {
     ;  // wait for serial port to connect. Needed for Native USB only
   }

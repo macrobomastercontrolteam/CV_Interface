@@ -3,7 +3,7 @@ char RxString[100];  //Initialized variable to store receive
 uint8_t RxChar;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   while (!Serial) {
     ;  // wait for serial port to connect. Needed for Native USB only
   }
