@@ -50,9 +50,15 @@ class CvCmdHandler:
         self.Rx_State = self.eRxState.RX_STATE_INIT
 
     # @brief main API function
-    # @param[in] gimbal_coordinate_x and gimbal_coordinate_y: type is int; must be positive; will be converted to uint16_t
+    # @param[in] gimbal_coordinate_x and gimbal_coordinate_y: type is int; will be converted to int16_t
     # @param[in] chassis_speed_x and chassis_speed_y: type is float; can be positive/negative; will be converted to float (32 bits)
     def CvCmd_Heartbeat(self, gimbal_coordinate_x, gimbal_coordinate_y, chassis_speed_x, chassis_speed_y):
+        # CV positive directions: +x is to the right, +y is upwards
+        # Remote controller positive directions: +x is upwards, +y is to the left
+        gimbal_coordinate_x, gimbal_coordinate_y = gimbal_coordinate_y, gimbal_coordinate_x
+        chassis_speed_x, chassis_speed_y = chassis_speed_y, chassis_speed_x
+        chassis_speed_y = -chassis_speed_x
+
         # Tx
         if self.AutoAimSwitch or self.AutoMoveSwitch:
             self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+12] = b''.join([gimbal_coordinate_x.to_bytes(2, 'little'), gimbal_coordinate_y.to_bytes(2, 'little'), struct.pack('<f', chassis_speed_x), struct.pack('<f', chassis_speed_y)])
