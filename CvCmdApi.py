@@ -37,8 +37,9 @@ class CvCmdHandler:
         self.EnemySwitch = False
         self.rxSwitchBuffer = 0
 
-        # self.ser = serial.Serial(port='/dev/serial0', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
-        self.ser = serial.Serial(port='COM9', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+        self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+        ## Manual test on Windows
+        # self.ser = serial.Serial(port='COM9', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
 
         self.txCvCmdMsg = bytearray(self.eSepChar.CHAR_STX.value + self.eMsgType.MSG_CV_CMD.value + self.eSepChar.CHAR_UNUSED.value*12 + self.eSepChar.CHAR_ETX.value)
         # txAckMsg is always the same, so use the immutable bytes object
