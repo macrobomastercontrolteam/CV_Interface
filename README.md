@@ -19,4 +19,5 @@ Whenever the button is pressed, arduino will send a set-mode request.
 
 
 ## TX2 Test Circuit Diagram
+Port : /dev/ttyTHS2
 ![6634a59717a0defd36d039292c8d643](https://user-images.githubusercontent.com/56321690/236954118-339b6e05-28cb-4140-a3d6-6123518752b6.jpg)
