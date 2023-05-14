@@ -66,10 +66,15 @@ class CvCmdHandler:
             self.ser.write(self.txCvCmdMsg)
 
         # Rx
-        self.CvCmd_RxHeartbeat()
+        fHeartbeatFinished = False
+        while fHeartbeatFinished == False:
+            fHeartbeatFinished = self.CvCmd_RxHeartbeat()
+
         return (self.AutoAimSwitch, self.AutoMoveSwitch, self.EnemySwitch)
 
     def CvCmd_RxHeartbeat(self):
+        fHeartbeatFinished = True
+
         if self.Rx_State == self.eRxState.RX_STATE_INIT:
             self.AutoAimSwitch = False
             self.AutoMoveSwitch = False
@@ -83,6 +88,7 @@ class CvCmdHandler:
 
             # print("Reactor online. Sensors online. Weapons online. All systems nominal.\n")
             self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_STX
+            fHeartbeatFinished = True
 
         elif self.Rx_State == self.eRxState.RX_STATE_WAIT_FOR_STX:
             # polling for control msg, if any msg received, ACK back
@@ -91,8 +97,10 @@ class CvCmdHandler:
                 bytesUpToStx = self.ser.read_until(self.eSepChar.CHAR_STX.value)
                 if bytesUpToStx and (bytesUpToStx[-1] == int.from_bytes(self.eSepChar.CHAR_STX.value, 'little')):
                     self.Rx_State = self.eRxState.RX_STATE_READ_PAYLOAD
+                    fHeartbeatFinished = False
                 else:
                     self.ser.reset_input_buffer()
+                    fHeartbeatFinished = True
 
         elif self.Rx_State == self.eRxState.RX_STATE_READ_PAYLOAD:
             # CHAR_STX may be the last char in the buffer when switching from RX_STATE_WAIT_FOR_STX, so need to take care of in_waiting size here
@@ -111,11 +119,16 @@ class CvCmdHandler:
                         self.ser.write(self.txAckMsg)
                         self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_STX
                         fInvalid = False
+                        fHeartbeatFinished = True
 
                 if fInvalid:
                     # maybe reader cursor derailed; immediately look for STX again to save looping time
                     bytesUpToStx = self.ser.read_until(self.eSepChar.CHAR_STX.value)
                     if bytesUpToStx and (bytesUpToStx[-1] == int.from_bytes(self.eSepChar.CHAR_STX.value, 'little')):
-                        pass  # stay in this state; read payload of next msg
+                        # stay in this state; read payload of next msg
+                        fHeartbeatFinished = False
                     else:
                         self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_STX
+                        fHeartbeatFinished = True
+
+        return fHeartbeatFinished
