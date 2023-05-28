@@ -1,5 +1,5 @@
-// Serial is USB interface with RPi; used to flash Arduino and view real-time output
-// cvSerial is UART interface with RPi; used to emulate CV communication
+// Serial is USB interface; is used to flash Arduino and view real-time output
+// cvSerial is UART interface; is used to emulate CV communication
 
 #include <SoftwareSerial.h>
 const byte virtualRxPin = 6;
@@ -28,4 +28,38 @@ void loop() {
     cvSerial.write(RxString, bytestoread);
   }
   delay(100);
+
+  // Serial.write(0x02);
+  // Serial.write(0x10);
+  // Serial.write(0x02);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // // Serial.write(0x03);
+  // delay(1000);
+  
+  // Serial.write(0x02);
+  // Serial.write(0x10);
+  // Serial.write(0x02);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0xFF);
+  // Serial.write(0x03);
+  // delay(1000);
 }
