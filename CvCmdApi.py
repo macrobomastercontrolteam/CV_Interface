@@ -8,7 +8,7 @@ import re
 class CvCmdHandler:
     # misc constants
     DATA_PACKAGE_SIZE = 15
-    DATA_PAYLOAD_INDEX = 2
+    DATA_PAYLOAD_INDEX = 3
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
 
     class eMsgType(Enum):
@@ -17,8 +17,7 @@ class CvCmdHandler:
         MSG_ACK = b'\x40'
 
     class eSepChar(Enum):  # start and ending hexes, acknowledgement bit
-        CHAR_STX = b'\x02'
-        CHAR_ETX = b'\x03'
+        CHAR_HEADER = b'>>'
         ACK_ASCII = b'ACK'
         CHAR_UNUSED = b'\xFF'
 
@@ -44,9 +43,9 @@ class CvCmdHandler:
         # Manual test on Windows
         self.ser = serial.Serial(port='COM8', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
 
-        self.txCvCmdMsg = bytearray(self.eSepChar.CHAR_STX.value + self.eMsgType.MSG_CV_CMD.value + self.eSepChar.CHAR_UNUSED.value*12 + self.eSepChar.CHAR_ETX.value)
+        self.txCvCmdMsg = bytearray(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_CV_CMD.value + self.eSepChar.CHAR_UNUSED.value*12)
         # txAckMsg is always the same, so use the immutable bytes object
-        self.txAckMsg = b''.join([self.eSepChar.CHAR_STX.value, self.eMsgType.MSG_ACK.value, self.eSepChar.ACK_ASCII.value, self.eSepChar.CHAR_UNUSED.value*9, self.eSepChar.CHAR_ETX.value])
+        self.txAckMsg = b''.join([self.eSepChar.CHAR_HEADER.value, self.eMsgType.MSG_ACK.value, self.eSepChar.ACK_ASCII.value, self.eSepChar.CHAR_UNUSED.value*9])
         assert (len(self.txCvCmdMsg) == self.DATA_PACKAGE_SIZE)
         assert (len(self.txAckMsg) == self.DATA_PACKAGE_SIZE)
 
@@ -98,10 +97,10 @@ class CvCmdHandler:
             # polling for control msg, if any msg received, ACK back
             if self.ser.in_waiting >= self.DATA_PACKAGE_SIZE:
                 bytesRead = self.ser.read(self.ser.in_waiting)
-                dataPackets = re.findall(self.eSepChar.CHAR_STX.value + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{11}" + self.eSepChar.CHAR_ETX.value, bytesRead)
+                dataPackets = re.findall(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{11}", bytesRead)
                 if dataPackets:
                     # read the mode of the last packet, because it's the latest
-                    self.rxSwitchBuffer = dataPackets[-1][2]
+                    self.rxSwitchBuffer = dataPackets[-1][self.DATA_PAYLOAD_INDEX]
                     self.AutoAimSwitch = bool(self.rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_AIM_BIT.value)
                     self.AutoMoveSwitch = bool(self.rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_MOVE_BIT.value)
                     self.EnemySwitch = bool(self.rxSwitchBuffer & self.eModeControlBits.MODE_ENEMY_DETECTED_BIT.value)
@@ -120,10 +119,8 @@ class CvCmdHandler:
 
         return fHeartbeatFinished
 
-
-CvCmder = CvCmdHandler()
-
-# Example usage
+## Example usage
+# CvCmder = CvCmdHandler()
 # oldflags = (False, False, False)
 # while True:
 #     flags = CvCmder.CvCmd_Heartbeat(0, 0, 0, 0)  # gimbal_coordinate_x, gimbal_coordinate_y, chassis_speed_x, chassis_speed_y
