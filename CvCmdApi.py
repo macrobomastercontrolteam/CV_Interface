@@ -10,6 +10,7 @@ class CvCmdHandler:
     DATA_PACKAGE_SIZE = 19  # 2 bytes header, 1 byte msg type, 16 bytes payload
     DATA_PAYLOAD_INDEX = 3
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
+    SHOOT_TIMEOUT_SEC = 8
 
     class eMsgType(Enum):
         MSG_MODE_CONTROL = b'\x10'
@@ -30,6 +31,7 @@ class CvCmdHandler:
         MODE_AUTO_AIM_BIT = 0b00000001
         MODE_AUTO_MOVE_BIT = 0b00000010
         MODE_ENEMY_DETECTED_BIT = 0b00000100
+        MODE_SHOOT_BIT = 0b00001000
 
     # @param[in] max_gimbal_coordinate_x, max_gimbal_coordinate_y: type is int; unit is pixel; starts from 1
     # @param[in] max_gimbal_angle_yaw: field of view angle; type is float; unit is radian
@@ -55,6 +57,7 @@ class CvCmdHandler:
         self.ser = serial.Serial(port=serial_port, baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
 
         self.txCvCmdMsg = bytearray(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_CV_CMD.value + self.eSepChar.CHAR_UNUSED.value*16)
+        self.txSetModeMsg = bytearray(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_MODE_CONTROL.value + b'\x00' + self.eSepChar.CHAR_UNUSED.value*15)
         # txAckMsg is always the same, so use the immutable bytes object
         self.txAckMsg = b''.join([self.eSepChar.CHAR_HEADER.value, self.eMsgType.MSG_ACK.value, self.eSepChar.ACK_ASCII.value, self.eSepChar.CHAR_UNUSED.value*13])
 
@@ -148,6 +151,8 @@ class CvCmdHandler:
                     self.AutoAimSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_AIM_BIT.value)
                     self.AutoMoveSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_MOVE_BIT.value)
                     self.EnemySwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_ENEMY_DETECTED_BIT.value)
+                    # Shoot switch is controlled by CV
+                    # self.ShootSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_SHOOT_BIT.value)
                     self.Rx_State = self.eRxState.RX_STATE_SEND_ACK
                     fHeartbeatFinished = False
                 else:
@@ -171,3 +176,22 @@ class CvCmdHandler:
             # print("Delta pitch: ", self.gimbal_cmd_delta_pitch)
             self.ser.write(self.txCvCmdMsg)
             self.prevTxTime = time.time()
+        
+        # Latching shoot switch logic
+        if self.ShootSwitch:
+            if self.PrevShootSwitch == False:
+                if time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC:
+                    self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_SHOOT_BIT.value
+                    self.ser.write(self.txSetModeMsg)
+                    self.prevTxTime = time.time()
+                    self.shootStartTime = time.time()
+                    self.PrevShootSwitch = True
+            elif time.time() - self.shootStartTime > self.SHOOT_TIMEOUT_SEC:
+                # control should automatically disable itself as well
+                self.shootStartTime = time.time()
+                self.ShootSwitch = False
+                self.PrevShootSwitch = False
+
+    def CvCmd_Shoot(self):
+        # ShootSwitch will be automatically disabled after SHOOT_TIMEOUT_SEC
+        self.ShootSwitch = True
