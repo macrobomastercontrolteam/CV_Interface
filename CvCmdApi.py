@@ -36,7 +36,6 @@ class CvCmdHandler:
         self.AutoAimSwitch = False
         self.AutoMoveSwitch = False
         self.EnemySwitch = False
-        self.rxSwitchBuffer = 0
         self.prevTxTime = 0
 
         # self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
@@ -100,10 +99,10 @@ class CvCmdHandler:
                 dataPackets = re.findall(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
                 if dataPackets:
                     # read the mode of the last packet, because it's the latest
-                    self.rxSwitchBuffer = dataPackets[-1][self.DATA_PAYLOAD_INDEX]
-                    self.AutoAimSwitch = bool(self.rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_AIM_BIT.value)
-                    self.AutoMoveSwitch = bool(self.rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_MOVE_BIT.value)
-                    self.EnemySwitch = bool(self.rxSwitchBuffer & self.eModeControlBits.MODE_ENEMY_DETECTED_BIT.value)
+                    rxSwitchBuffer = dataPackets[-1][self.DATA_PAYLOAD_INDEX]
+                    self.AutoAimSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_AIM_BIT.value)
+                    self.AutoMoveSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_MOVE_BIT.value)
+                    self.EnemySwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_ENEMY_DETECTED_BIT.value)
                     self.Rx_State = self.eRxState.RX_STATE_SEND_ACK
                     fHeartbeatFinished = False
                 else:
