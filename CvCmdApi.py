@@ -31,12 +31,12 @@ class CvCmdHandler:
         MODE_AUTO_MOVE_BIT = 0b00000010
         MODE_ENEMY_DETECTED_BIT = 0b00000100
 
-    def __init__(self):
+    def __init__(self, serial_port):
         self.CvCmd_Reset()
 
         # self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
         # Manual test on Windows
-        self.ser = serial.Serial(port='COM8', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+        self.ser = serial.Serial(port=serial_port, baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
 
         self.txCvCmdMsg = bytearray(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_CV_CMD.value + self.eSepChar.CHAR_UNUSED.value*16)
         # txAckMsg is always the same, so use the immutable bytes object
