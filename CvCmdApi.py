@@ -3,7 +3,7 @@ import time
 import serial
 import struct
 import re
-
+import math
 
 class CvCmdHandler:
     # misc constants
@@ -31,7 +31,23 @@ class CvCmdHandler:
         MODE_AUTO_MOVE_BIT = 0b00000010
         MODE_ENEMY_DETECTED_BIT = 0b00000100
 
-    def __init__(self, serial_port):
+    # @param[in] max_gimbal_coordinate_x, max_gimbal_coordinate_y: type is int; unit is pixel; starts from 1
+    # @param[in] max_gimbal_angle_yaw: field of view angle; type is float; unit is radian
+    def __init__(self, serial_port, max_gimbal_coordinate_x, max_gimbal_coordinate_y, max_gimbal_angle_yaw, focal_length_in_mm=None, optical_format=None, camera_to_axis_distance=None):
+        # Hardware parameters
+        self.camera_to_axis_distance = camera_to_axis_distance
+        self.half_gimbal_coordinate_x = max_gimbal_coordinate_x/2
+        self.half_gimbal_coordinate_y = max_gimbal_coordinate_y/2
+        self.focal_length_in_pixel = self.half_gimbal_coordinate_x / math.tan(max_gimbal_angle_yaw*math.pi/180/2)
+        # Because the manufacturer may truncate usable pixels, the following calculation may not be accurate
+        # if focal_length_in_mm != None:
+        #     # TODO: extend support to different optical_format
+        #     # optical_format = 1 for 1/4''; 2 for 1/2''; 4 for 1''; 8 for 2''
+        #     if optical_format == 1:
+        #         assert (abs(focal_length_in_mm - self.focal_length_in_pixel * (3.6/max_gimbal_coordinate_x)) <= 0.1)
+        #     else:
+        #         raise NotImplementedError
+
         self.CvCmd_Reset()
 
         # self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
@@ -79,12 +95,8 @@ class CvCmdHandler:
         self.chassis_speed_y = chassis_speed_y
         self.target_depth = target_depth
 
-        # CV positive directions: +x is to the right, +y is upwards
-        # Remote controller positive directions: +x is upwards, +y is to the left
-        gimbal_coordinate_x, gimbal_coordinate_y = gimbal_coordinate_y, gimbal_coordinate_x
-        chassis_speed_x, chassis_speed_y = chassis_speed_y, chassis_speed_x
-        chassis_speed_y = -chassis_speed_y
-
+        # Condition signals
+        self.CvCmd_ConditionSignals()
         # Tx
         self.CvCmd_TxHeartbeat()
         # Rx
@@ -93,6 +105,27 @@ class CvCmdHandler:
             fHeartbeatFinished = self.CvCmd_RxHeartbeat()
 
         return (self.AutoAimSwitch, self.AutoMoveSwitch, self.EnemySwitch)
+
+    def CvCmd_ConditionSignals(self):
+        # Gimbal: pixel to angle conversion
+        # TODO: Use parabolic instead of linear trajectory
+        # CV positive directions: +x is to the right, +y is downwards
+        # angle unit is radian
+        camera_angle_x = math.atan((self.gimbal_coordinate_x - self.half_gimbal_coordinate_x)/self.focal_length_in_pixel)
+        camera_angle_y = math.atan((self.half_gimbal_coordinate_y - self.gimbal_coordinate_y)/self.focal_length_in_pixel)
+        if (self.target_depth == None) or (self.camera_to_axis_distance == None):
+            # Approximation is valid if self.target_depth >> self.camera_to_axis_distance
+            self.gimbal_cmd_delta_yaw = camera_angle_x
+            self.gimbal_cmd_delta_pitch = camera_angle_y
+        else:
+            self.gimbal_cmd_delta_yaw = math.atan(self.target_depth*math.sin(camera_angle_x)/(self.camera_to_axis_distance+math.sin(camera_angle_x)))
+            self.gimbal_cmd_delta_pitch = math.atan(self.target_depth*math.sin(camera_angle_y)/(self.camera_to_axis_distance+math.sin(camera_angle_y)))
+
+        # Chassis: speed to speed conversion
+        # CV positive directions: +x is to the right, +y is upwards
+        # Remote controller positive directions: +x is upwards, +y is to the left
+        self.chassis_cmd_speed_x = self.chassis_speed_y
+        self.chassis_cmd_speed_y = -self.chassis_speed_x
 
     def CvCmd_RxHeartbeat(self):
         fHeartbeatFinished = True
