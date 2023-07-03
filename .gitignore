@@ -7,9 +7,11 @@ build/compile_commands.json
 *.d
 *.elf
 *.o
+*.pyc
 build/build.options.json
 build/preproc/ctags_target_for_gcc_minus_e.cpp
 build/sketch/Test_Arduino.ino.cpp
 .vscode/arduino.json
 Two_Arduinos/Test_Arduino/.theia/launch.json
 .vscode/c_cpp_properties.json
+.vscode/settings.json
