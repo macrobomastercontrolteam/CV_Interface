@@ -32,29 +32,53 @@ class CvCmdHandler:
         MODE_ENEMY_DETECTED_BIT = 0b00000100
 
     def __init__(self):
-        self.Rx_State = self.eRxState.RX_STATE_INIT
-        self.AutoAimSwitch = False
-        self.AutoMoveSwitch = False
-        self.EnemySwitch = False
-        self.prevTxTime = 0
+        self.CvCmd_Reset()
 
         # self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
         # Manual test on Windows
         self.ser = serial.Serial(port='COM8', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
 
-        self.txCvCmdMsg = bytearray(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_CV_CMD.value + self.eSepChar.CHAR_UNUSED.value*12)
+        self.txCvCmdMsg = bytearray(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_CV_CMD.value + self.eSepChar.CHAR_UNUSED.value*16)
         # txAckMsg is always the same, so use the immutable bytes object
-        self.txAckMsg = b''.join([self.eSepChar.CHAR_HEADER.value, self.eMsgType.MSG_ACK.value, self.eSepChar.ACK_ASCII.value, self.eSepChar.CHAR_UNUSED.value*9])
+        self.txAckMsg = b''.join([self.eSepChar.CHAR_HEADER.value, self.eMsgType.MSG_ACK.value, self.eSepChar.ACK_ASCII.value, self.eSepChar.CHAR_UNUSED.value*13])
+
         assert (len(self.txCvCmdMsg) == self.DATA_PACKAGE_SIZE)
         assert (len(self.txAckMsg) == self.DATA_PACKAGE_SIZE)
+        assert (len(self.txSetModeMsg) == self.DATA_PACKAGE_SIZE)
 
     def CvCmd_Reset(self):
+        self.prevTxTime = 0
+        self.AutoAimSwitch = False
+        self.AutoMoveSwitch = False
+        self.EnemySwitch = False
+        self.PrevShootSwitch = False
+        self.ShootSwitch = False
+        self.gimbal_cmd_delta_yaw = 0
+        self.gimbal_cmd_delta_pitch = 0
+        self.chassis_cmd_speed_x = 0
+        self.chassis_cmd_speed_y = 0
+        self.gimbal_coordinate_x = 0
+        self.gimbal_coordinate_y = 0
+        self.chassis_speed_x = 0
+        self.chassis_speed_y = 0
+        self.target_depth = None
         self.Rx_State = self.eRxState.RX_STATE_INIT
+        try:
+            self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+        except:
+            pass
 
     # @brief main API function
     # @param[in] gimbal_coordinate_x and gimbal_coordinate_y: type is int; will be converted to int16_t
     # @param[in] chassis_speed_x and chassis_speed_y: type is float; can be positive/negative; will be converted to float (32 bits)
-    def CvCmd_Heartbeat(self, gimbal_coordinate_x, gimbal_coordinate_y, chassis_speed_x, chassis_speed_y):
+    def CvCmd_Heartbeat(self, gimbal_coordinate_x, gimbal_coordinate_y, chassis_speed_x, chassis_speed_y, target_depth=None):
+        self.gimbal_coordinate_x = gimbal_coordinate_x
+        self.gimbal_coordinate_y = gimbal_coordinate_y
+        self.chassis_speed_x = chassis_speed_x
+        self.chassis_speed_y = chassis_speed_y
+        self.target_depth = target_depth
+
         # CV positive directions: +x is to the right, +y is upwards
         # Remote controller positive directions: +x is upwards, +y is to the left
         gimbal_coordinate_x, gimbal_coordinate_y = gimbal_coordinate_y, gimbal_coordinate_x
@@ -62,11 +86,7 @@ class CvCmdHandler:
         chassis_speed_y = -chassis_speed_y
 
         # Tx
-        if (self.AutoAimSwitch or self.AutoMoveSwitch) and (time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC):
-            self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+12] = b''.join([gimbal_coordinate_x.to_bytes(2, 'little'), gimbal_coordinate_y.to_bytes(2, 'little'), struct.pack('<f', chassis_speed_x), struct.pack('<f', chassis_speed_y)])
-            self.ser.write(self.txCvCmdMsg)
-            self.prevTxTime = time.time()
-
+        self.CvCmd_TxHeartbeat()
         # Rx
         fHeartbeatFinished = False
         while fHeartbeatFinished == False:
@@ -78,17 +98,9 @@ class CvCmdHandler:
         fHeartbeatFinished = True
 
         if self.Rx_State == self.eRxState.RX_STATE_INIT:
-            self.AutoAimSwitch = False
-            self.AutoMoveSwitch = False
-            self.EnemySwitch = False
-
             if not self.ser.is_open:
                 self.ser.open()
-            # control board sends many garbage data when it restarts, so clean buffer here
-            self.ser.reset_input_buffer()
-            self.ser.reset_output_buffer()
-
-            # print("Reactor online. Sensors online. Weapons online. All systems nominal.\n")
+            self.CvCmd_Reset()
             self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
             fHeartbeatFinished = True
 
@@ -118,11 +130,11 @@ class CvCmdHandler:
 
         return fHeartbeatFinished
 
-## Example usage
-# CvCmder = CvCmdHandler()
-# oldflags = (False, False, False)
-# while True:
-#     flags = CvCmder.CvCmd_Heartbeat(0, 0, 0, 0)  # gimbal_coordinate_x, gimbal_coordinate_y, chassis_speed_x, chassis_speed_y
-#     if flags != oldflags:
-#         oldflags = flags
-#         print(flags)
+    def CvCmd_TxHeartbeat(self):
+        # Tx: keeping sending cmd to keep control board alive (watchdog timer logic)
+        if (self.AutoAimSwitch or self.AutoMoveSwitch) and (time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC):
+            self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_delta_yaw, self.gimbal_cmd_delta_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
+            # print("Delta yaw: ", self.gimbal_cmd_delta_yaw)
+            # print("Delta pitch: ", self.gimbal_cmd_delta_pitch)
+            self.ser.write(self.txCvCmdMsg)
+            self.prevTxTime = time.time()
