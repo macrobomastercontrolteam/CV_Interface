@@ -23,7 +23,7 @@ class CvCmdHandler:
 
     class eRxState(Enum):
         RX_STATE_INIT = 0
-        RX_STATE_WAIT_FOR_ETX = 1
+        RX_STATE_WAIT_FOR_PKG = 1
         RX_STATE_SEND_ACK = 2
 
     class eModeControlBits(Enum):
@@ -90,14 +90,14 @@ class CvCmdHandler:
             self.ser.reset_output_buffer()
 
             # print("Reactor online. Sensors online. Weapons online. All systems nominal.\n")
-            self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_ETX
+            self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
             fHeartbeatFinished = True
 
-        elif self.Rx_State == self.eRxState.RX_STATE_WAIT_FOR_ETX:
+        elif self.Rx_State == self.eRxState.RX_STATE_WAIT_FOR_PKG:
             # polling for control msg, if any msg received, ACK back
             if self.ser.in_waiting >= self.DATA_PACKAGE_SIZE:
                 bytesRead = self.ser.read(self.ser.in_waiting)
-                dataPackets = re.findall(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{11}", bytesRead)
+                dataPackets = re.findall(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
                 if dataPackets:
                     # read the mode of the last packet, because it's the latest
                     self.rxSwitchBuffer = dataPackets[-1][self.DATA_PAYLOAD_INDEX]
@@ -114,7 +114,7 @@ class CvCmdHandler:
             if time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC:
                 self.ser.write(self.txAckMsg)
                 self.prevTxTime = time.time()
-                self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_ETX
+                self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
             fHeartbeatFinished = True
 
         return fHeartbeatFinished
