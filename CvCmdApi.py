@@ -7,7 +7,7 @@ import re
 
 class CvCmdHandler:
     # misc constants
-    DATA_PACKAGE_SIZE = 15
+    DATA_PACKAGE_SIZE = 19  # 2 bytes header, 1 byte msg type, 16 bytes payload
     DATA_PAYLOAD_INDEX = 3
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
 
