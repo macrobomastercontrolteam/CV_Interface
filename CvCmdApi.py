@@ -10,7 +10,7 @@ class CvCmdHandler:
     DATA_PACKAGE_SIZE = 19  # 2 bytes header, 1 byte msg type, 16 bytes payload
     DATA_PAYLOAD_INDEX = 3
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
-    SHOOT_TIMEOUT_SEC = 8
+    SHOOT_TIMEOUT_SEC = 2
 
     class eMsgType(Enum):
         MSG_MODE_CONTROL = b'\x10'
