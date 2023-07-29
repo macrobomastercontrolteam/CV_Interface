@@ -33,20 +33,20 @@ class CvCmdHandler:
         MODE_ENEMY_DETECTED_BIT = 0b00000100
         MODE_SHOOT_BIT = 0b00001000
 
-    # @param[in] max_gimbal_coordinate_x, max_gimbal_coordinate_y: type is int; unit is pixel; starts from 1
-    # @param[in] max_gimbal_angle_yaw: field of view angle; type is float; unit is radian
-    def __init__(self, serial_port, max_gimbal_coordinate_x, max_gimbal_coordinate_y, max_gimbal_angle_yaw, focal_length_in_mm=None, optical_format=None, camera_to_axis_distance=None):
+    # @param[in] max_camera_coordinate_x, max_camera_coordinate_y: type is int; unit is pixel; starts from 1
+    # @param[in] max_camera_angle_yaw: field of view angle; type is float; unit is radian
+    def __init__(self, serial_port, max_camera_coordinate_x, max_camera_coordinate_y, max_camera_angle_yaw, focal_length_in_mm=None, optical_format=None, camera_to_axis_distance=None):
         # Hardware parameters
         self.camera_to_axis_distance = camera_to_axis_distance
-        self.half_gimbal_coordinate_x = max_gimbal_coordinate_x/2
-        self.half_gimbal_coordinate_y = max_gimbal_coordinate_y/2
-        self.focal_length_in_pixel = self.half_gimbal_coordinate_x / math.tan(max_gimbal_angle_yaw*math.pi/180/2)
+        self.half_camera_coordinate_x = max_camera_coordinate_x/2
+        self.half_camera_coordinate_y = max_camera_coordinate_y/2
+        self.focal_length_in_pixel = self.half_camera_coordinate_x / math.tan(max_camera_angle_yaw*math.pi/180/2)
         # Because the manufacturer may truncate usable pixels, the following calculation may not be accurate
         # if focal_length_in_mm != None:
         #     # TODO: extend support to different optical_format
         #     # optical_format = 1 for 1/4''; 2 for 1/2''; 4 for 1''; 8 for 2''
         #     if optical_format == 1:
-        #         assert (abs(focal_length_in_mm - self.focal_length_in_pixel * (3.6/max_gimbal_coordinate_x)) <= 0.1)
+        #         assert (abs(focal_length_in_mm - self.focal_length_in_pixel * (3.6/max_camera_coordinate_x)) <= 0.1)
         #     else:
         #         raise NotImplementedError
 
@@ -114,8 +114,8 @@ class CvCmdHandler:
         # TODO: Use parabolic instead of linear trajectory
         # CV positive directions: +x is to the right, +y is downwards
         # angle unit is radian
-        camera_angle_x = math.atan((self.gimbal_coordinate_x - self.half_gimbal_coordinate_x)/self.focal_length_in_pixel)
-        camera_angle_y = math.atan((self.half_gimbal_coordinate_y - self.gimbal_coordinate_y)/self.focal_length_in_pixel)
+        camera_angle_x = math.atan((self.gimbal_coordinate_x - self.half_camera_coordinate_x)/self.focal_length_in_pixel)
+        camera_angle_y = math.atan((self.half_camera_coordinate_y - self.gimbal_coordinate_y)/self.focal_length_in_pixel)
         if (self.target_depth == None) or (self.camera_to_axis_distance == None):
             # Approximation is valid if self.target_depth >> self.camera_to_axis_distance
             self.gimbal_cmd_delta_yaw = camera_angle_x
