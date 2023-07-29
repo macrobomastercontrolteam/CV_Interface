@@ -11,6 +11,7 @@ class CvCmdHandler:
     DATA_PAYLOAD_INDEX = 3
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
     SHOOT_TIMEOUT_SEC = 2
+    DEBUG_CV = True
 
     class eMsgType(Enum):
         MSG_MODE_CONTROL = b'\x10'
@@ -82,6 +83,7 @@ class CvCmdHandler:
         self.chassis_speed_y = 0
         self.target_depth = None
         self.Rx_State = self.eRxState.RX_STATE_INIT
+        self.prev_Rx_State = self.Rx_State
         try:
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
@@ -123,6 +125,8 @@ class CvCmdHandler:
         else:
             self.gimbal_cmd_delta_yaw = math.atan(self.target_depth*math.sin(camera_angle_x)/(self.camera_to_axis_distance+math.sin(camera_angle_x)))
             self.gimbal_cmd_delta_pitch = math.atan(self.target_depth*math.sin(camera_angle_y)/(self.camera_to_axis_distance+math.sin(camera_angle_y)))
+        if self.DEBUG_CV:
+            print("gimbal_cmd_delta_yaw: ",self.gimbal_cmd_delta_yaw,"gimbal_cmd_delta_pitch: ",self.gimbal_cmd_delta_pitch)
 
         # Chassis: speed to speed conversion
         # CV positive directions: +x is to the right, +y is upwards
@@ -132,6 +136,13 @@ class CvCmdHandler:
 
     def CvCmd_RxHeartbeat(self):
         fHeartbeatFinished = True
+
+        if self.DEBUG_CV:
+            if self.ser.is_open and self.ser.in_waiting > 0:
+                print("Input buffer size: ", self.ser.in_waiting)
+            if self.prev_Rx_State != self.Rx_State:
+                print("Rx_State: ", self.Rx_State)
+                self.prev_Rx_State = self.Rx_State
 
         if self.Rx_State == self.eRxState.RX_STATE_INIT:
             if not self.ser.is_open:
@@ -145,6 +156,10 @@ class CvCmdHandler:
             if self.ser.in_waiting >= self.DATA_PACKAGE_SIZE:
                 bytesRead = self.ser.read(self.ser.in_waiting)
                 dataPackets = re.findall(self.eSepChar.CHAR_HEADER.value + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
+                if self.DEBUG_CV:
+                    print("bytesRead: ", bytesRead)
+                    print("dataPackets: ", dataPackets)
+
                 if dataPackets:
                     # read the mode of the last packet, because it's the latest
                     rxSwitchBuffer = dataPackets[-1][self.DATA_PAYLOAD_INDEX]
@@ -162,6 +177,8 @@ class CvCmdHandler:
         elif self.Rx_State == self.eRxState.RX_STATE_SEND_ACK:
             if time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC:
                 self.ser.write(self.txAckMsg)
+                if self.DEBUG_CV:
+                    print("ACK sent")
                 self.prevTxTime = time.time()
                 self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
             fHeartbeatFinished = True
@@ -172,8 +189,8 @@ class CvCmdHandler:
         # Tx: keeping sending cmd to keep control board alive (watchdog timer logic)
         if (self.AutoAimSwitch or self.AutoMoveSwitch) and (time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC):
             self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_delta_yaw, self.gimbal_cmd_delta_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
-            # print("Delta yaw: ", self.gimbal_cmd_delta_yaw)
-            # print("Delta pitch: ", self.gimbal_cmd_delta_pitch)
+            if self.DEBUG_CV:
+                print("gimbal cmd sent")
             self.ser.write(self.txCvCmdMsg)
             self.prevTxTime = time.time()
         
