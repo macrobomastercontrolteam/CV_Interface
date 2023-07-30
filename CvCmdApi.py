@@ -94,10 +94,10 @@ class CvCmdHandler:
     # @param[in] gimbal_coordinate_x and gimbal_coordinate_y: type is int; will be converted to int16_t
     # @param[in] chassis_speed_x and chassis_speed_y: type is float; can be positive/negative; will be converted to float (32 bits)
     def CvCmd_Heartbeat(self, gimbal_coordinate_x, gimbal_coordinate_y, chassis_speed_x, chassis_speed_y, target_depth=None):
-        self.gimbal_coordinate_x = gimbal_coordinate_x
-        self.gimbal_coordinate_y = gimbal_coordinate_y
-        self.chassis_speed_x = chassis_speed_x
-        self.chassis_speed_y = chassis_speed_y
+        self.gimbal_coordinate_x = int(gimbal_coordinate_x)
+        self.gimbal_coordinate_y = int(gimbal_coordinate_y)
+        self.chassis_speed_x = float(chassis_speed_x)
+        self.chassis_speed_y = float(chassis_speed_y)
         self.target_depth = target_depth
 
         # Condition signals
