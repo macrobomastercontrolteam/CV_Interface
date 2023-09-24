@@ -8,7 +8,8 @@ CV requirement for python version: 3.6.9
 Reference: https://www.cs.cmu.edu/~16385/s17/Slides/11.1_Camera_matrix.pdf
 ### Camera frame to Control board IMU frame conversion
 Alternative IMU solutions:
-- **(Current setup)** Camera must have its own IMU to measure its orientation. The orientation of camera frame is different from the orientation of control board IMU frame. Therefore, the target 3D point in camera frame must be converted into control board IMU frame. We are free to do it on CV side before sending or control side after sending. For now, it's easier to do it on control side, because it's easier for Ctrl to find the transformation matrix during calibration process.
+- Camera must have its own IMU to measure its orientation. The orientation of camera frame is different from the orientation of control board IMU frame. Therefore, the target 3D point in camera frame must be converted into control board IMU frame. We are free to do it on CV side before sending or control side after sending. For now, it's easier to do it on control side, because it's easier for Ctrl to find the transformation matrix during calibration process.
+- **(Current setup)** CV stores a hardcoded transformation matrix to do the conversion before sending to Ctrl board
 - CV and Ctrl can share the same IMU. In this case, the orientation relationship with Camera and IMU should be hardcoded into CV, and target position should be converted into IMU frame before sending to Ctrl. Finally, Ctrl would not need to do any conversion.
 
 Control board should use its current IMU location, target location sent by CV and initial projectile speed setting to calculate the projectile direction as the setpoint for gimbal motors.
@@ -54,7 +55,7 @@ sequenceDiagram
         end
     end
 ```
-### Gimbal frame calibration process
+### Gimbal frame calibration process (not in used right now)
 ``` mermaid
 sequenceDiagram
     Control-->Control:Calibration process started by remote controller
