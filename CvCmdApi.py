@@ -64,9 +64,9 @@ class CvCmdHandler:
         self.CvSyncTime = 0
         self.CvCmd_Reset()
 
-        # self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+        # self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=1000000, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
         # Manual test on Windows
-        self.ser = serial.Serial(port=serial_port, baudrate=115200, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+        self.ser = serial.Serial(port=serial_port, baudrate=1000000, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
 
         self.txCvCmdMsg = self.CvCmd_InitTxMsg(self.eMsgType.MSG_CV_CMD.value)
         self.txInfoRequestMsg = self.CvCmd_InitTxMsg(self.eMsgType.MSG_INFO_REQUEST.value)
