@@ -34,7 +34,7 @@ while True:
     if counter == int(5/loop_delay):
         CvCmder.CvCmd_Shoot()
 
-    flags = CvCmder.CvCmd_Heartbeat(gimbal_coordinate_x=0,gimbal_coordinate_y=gimbal_coordinate_y_Slider,chassis_speed_x=chassis_speed_x_Slider,chassis_speed_y=chassis_speed_y_Slider)
+    flags = CvCmder.CvCmd_Heartbeat(gimbal_coordinate_x=1280/2, gimbal_coordinate_y=720/2,chassis_speed_x=chassis_speed_x_Slider,chassis_speed_y=chassis_speed_y_Slider)
     if flags != oldflags:
         oldflags = flags
         print(flags)
