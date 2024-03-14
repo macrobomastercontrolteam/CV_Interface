@@ -43,29 +43,12 @@ class CvCmdHandler:
         MODE_TRAN_DELTA_BIT = 0b00000001
         MODE_CV_SYNC_TIME_BIT = 0b00000010
 
-    # @param[in] max_camera_coordinate_x, max_camera_coordinate_y: type is int; unit is pixel; starts from 1
-    # @param[in] max_camera_angle_yaw: field of view angle; type is float; unit is radian
-    def __init__(self, serial_port, max_camera_coordinate_x, max_camera_coordinate_y, max_camera_angle_yaw, focal_length_in_mm=None, optical_format=None, camera_to_axis_distance=None):
-        # Hardware parameters
-        self.camera_to_axis_distance = camera_to_axis_distance
-        self.half_camera_coordinate_x = max_camera_coordinate_x/2
-        self.half_camera_coordinate_y = max_camera_coordinate_y/2
-        self.focal_length_in_pixel = self.half_camera_coordinate_x / math.tan(max_camera_angle_yaw*math.pi/180/2)
-        # Because the manufacturer may truncate usable pixels, the following calculation may not be accurate
-        # if focal_length_in_mm != None:
-        #     # TODO: extend support to different optical_format
-        #     # optical_format = 1 for 1/4''; 2 for 1/2''; 4 for 1''; 8 for 2''
-        #     if optical_format == 1:
-        #         assert (abs(focal_length_in_mm - self.focal_length_in_pixel * (3.6/max_camera_coordinate_x)) <= 0.1)
-        #     else:
-        #         raise NotImplementedError
-
+    def __init__(self, serial_port):
         self.ackMsgInfo = {"reqCtrlTimestamp": -1, "reqRxTimestamp": -1}
         self.CvSyncTime = 0
         self.CvCmd_Reset()
 
-        # self.ser = serial.Serial(port='/dev/ttyTHS2', baudrate=1000000, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
-        # Manual test on Windows
+        # Example port on ubuntu: port='/dev/ttyTHS2'
         self.ser = serial.Serial(port=serial_port, baudrate=1000000, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
 
         self.txCvCmdMsg = self.CvCmd_InitTxMsg(self.eMsgType.MSG_CV_CMD.value)
@@ -122,12 +105,8 @@ class CvCmdHandler:
         self.EnemySwitch = False
         self.PrevShootSwitch = False
         self.ShootSwitch = False
-        self.gimbal_cmd_delta_yaw = 0
-        self.gimbal_cmd_delta_pitch = 0
         self.chassis_cmd_speed_x = 0
         self.chassis_cmd_speed_y = 0
-        self.gimbal_coordinate_x = 0
-        self.gimbal_coordinate_y = 0
         self.chassis_speed_x = 0
         self.chassis_speed_y = 0
         self.target_depth = None
@@ -140,51 +119,31 @@ class CvCmdHandler:
             pass
 
     # @brief main API function
-    # @param[in] gimbal_coordinate_x and gimbal_coordinate_y: type is int; will be converted to int16_t
     # @param[in] chassis_speed_x and chassis_speed_y: type is float; can be positive/negative; will be converted to float (32 bits)
-    def CvCmd_Heartbeat(self, gimbal_coordinate_x, gimbal_coordinate_y, chassis_speed_x, chassis_speed_y, target_depth=None):
-        self.gimbal_coordinate_x = int(gimbal_coordinate_x)
-        self.gimbal_coordinate_y = int(gimbal_coordinate_y)
-        self.chassis_speed_x = float(chassis_speed_x)
-        self.chassis_speed_y = float(chassis_speed_y)
-        self.target_depth = target_depth
-
-        # Condition signals
-        self.CvCmd_ConditionSignals()
-        # Tx
+    def CvCmd_Heartbeat(self, gimbal_pitch_target, gimbal_yaw_target, chassis_speed_x, chassis_speed_y):
+        self.CvCmd_ConditionSignals(gimbal_pitch_target, gimbal_yaw_target, chassis_speed_x, chassis_speed_y)
         self.CvCmd_TxHeartbeat()
         # Rx
-        fHeartbeatFinished = False
-        while fHeartbeatFinished == False:
-            fHeartbeatFinished = self.CvCmd_RxHeartbeat()
-
+        fRxFinished = False
+        while fRxFinished == False:
+            fRxFinished = self.CvCmd_RxHeartbeat()
         return (self.AutoAimSwitch, self.AutoMoveSwitch, self.EnemySwitch)
 
-    def CvCmd_ConditionSignals(self):
-        # Gimbal: pixel to angle conversion
-        # TODO: Use parabolic instead of linear trajectory
-        # CV positive directions: +x is to the right, +y is downwards
-        # angle unit is radian
-        camera_angle_x = math.atan((self.gimbal_coordinate_x - self.half_camera_coordinate_x)/self.focal_length_in_pixel)
-        camera_angle_y = math.atan((self.half_camera_coordinate_y - self.gimbal_coordinate_y)/self.focal_length_in_pixel)
-        if (self.target_depth == None) or (self.camera_to_axis_distance == None):
-            # Approximation is valid if self.target_depth >> self.camera_to_axis_distance
-            self.gimbal_cmd_delta_yaw = camera_angle_x
-            self.gimbal_cmd_delta_pitch = camera_angle_y
-        else:
-            self.gimbal_cmd_delta_yaw = math.atan(self.target_depth*math.sin(camera_angle_x)/(self.camera_to_axis_distance+math.sin(camera_angle_x)))
-            self.gimbal_cmd_delta_pitch = math.atan(self.target_depth*math.sin(camera_angle_y)/(self.camera_to_axis_distance+math.sin(camera_angle_y)))
+    def CvCmd_ConditionSignals(self, gimbal_pitch_target, gimbal_yaw_target, chassis_speed_x, chassis_speed_y):
         if self.DEBUG_CV:
-            print("gimbal_cmd_delta_yaw: ", self.gimbal_cmd_delta_yaw, "gimbal_cmd_delta_pitch: ", self.gimbal_cmd_delta_pitch)
+            print("gimbal_yaw_target: ", gimbal_yaw_target, "gimbal_pitch_target: ", gimbal_pitch_target)
+
+        self.gimbal_cmd_pitch = gimbal_pitch_target
+        self.gimbal_cmd_yaw = gimbal_yaw_target
 
         # Chassis: speed to speed conversion
         # CV positive directions: +x is to the right, +y is upwards
         # Remote controller positive directions: +x is upwards, +y is to the left
-        self.chassis_cmd_speed_x = self.chassis_speed_y
-        self.chassis_cmd_speed_y = -self.chassis_speed_x
+        self.chassis_cmd_speed_x = float(chassis_speed_y)
+        self.chassis_cmd_speed_y = -float(chassis_speed_x)
 
     def CvCmd_RxHeartbeat(self):
-        fHeartbeatFinished = True
+        fRxFinished = True
 
         if self.DEBUG_CV:
             if self.ser.is_open and self.ser.in_waiting > 0:
@@ -198,7 +157,7 @@ class CvCmdHandler:
                 self.ser.open()
             self.CvCmd_Reset()
             self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
-            fHeartbeatFinished = True
+            fRxFinished = True
 
         elif self.Rx_State == self.eRxState.RX_STATE_WAIT_FOR_PKG:
             if self.ser.in_waiting >= self.DATA_PACKAGE_SIZE:
@@ -223,7 +182,7 @@ class CvCmdHandler:
                     self.ackMsgInfo["reqRxTimestamp"] = self.CvCmd_GetUint16Time()
                     self.cvCmdCount = 0
                     self.Rx_State = self.eRxState.RX_STATE_SEND_ACK
-                    fHeartbeatFinished = False
+                    fRxFinished = False
 
                 if infoFeedbackPackets:
                     for packet in infoFeedbackPackets:
@@ -240,25 +199,28 @@ class CvCmdHandler:
                             self.infoRequestPending &= ~rxInfoType
                             if self.DEBUG_CV:
                                 print("CvSyncTime: ", self.CvSyncTime)
-                    # Do not change Rx_State or fHeartbeatFinished
+                    # Do not change Rx_State or fRxFinished
 
                 # No valid msg received, retry connection
                 if not (setModeRequestPackets or infoFeedbackPackets):
                     self.ser.reset_input_buffer()
-                    fHeartbeatFinished = True
+                    fRxFinished = True
 
         elif self.Rx_State == self.eRxState.RX_STATE_SEND_ACK:
-            if time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC:
+            if (time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC):
+                # Timestamps
                 self.CvSyncTime = self.CvCmd_GetUint16Time()
                 uiExecDelta = self.CvCmd_GetUint16Delta(self.CvSyncTime, self.ackMsgInfo["reqRxTimestamp"])
                 self.txAckMsg[self.txAckMsgPayloadIndex:self.txAckMsgPayloadIndex+6] = struct.pack('<HHH', self.ackMsgInfo["reqCtrlTimestamp"], uiExecDelta, self.CvSyncTime)
+
                 self.CvCmd_BuildSendTxMsg(self.txAckMsg)
+
                 # Trigger info request in TxHeartbeat
                 self.infoRequestPending |= self.eInfoBits.MODE_TRAN_DELTA_BIT.value | self.eInfoBits.MODE_CV_SYNC_TIME_BIT.value
                 self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
-            fHeartbeatFinished = True
+            fRxFinished = True
 
-        return fHeartbeatFinished
+        return fRxFinished
 
     def CvCmd_TxHeartbeat(self):
         # Tx: keeping sending cmd to keep control board alive (watchdog timer logic)
@@ -268,7 +230,7 @@ class CvCmdHandler:
                 self.CvCmd_BuildSendTxMsg(self.txInfoRequestMsg)
                 self.prevInfoReqTime = time.time()
             elif ((self.AutoAimSwitch or self.AutoMoveSwitch) and (self.tranDelta != None)):
-                self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_delta_yaw, self.gimbal_cmd_delta_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
+                self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_yaw, self.gimbal_cmd_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
                 self.CvCmd_BuildSendTxMsg(self.txCvCmdMsg)
                 self.cvCmdCount += 1
                 if (self.cvCmdCount % 10 == 0):
