@@ -133,8 +133,12 @@ class CvCmdHandler:
         if self.DEBUG_CV:
             print("gimbal_yaw_target: ", gimbal_yaw_target, "gimbal_pitch_target: ", gimbal_pitch_target)
 
+        # Gimbal: pixel to angle conversion
+        # TODO: Use parabolic instead of linear trajectory
+        # CV positive directions: +x is to the right, +y is downwards
+        # angle unit is radian
         self.gimbal_cmd_pitch = gimbal_pitch_target
-        self.gimbal_cmd_yaw = gimbal_yaw_target
+        self.gimbal_cmd_yaw = -gimbal_yaw_target
 
         # Chassis: speed to speed conversion
         # CV positive directions: +x is to the right, +y is upwards
