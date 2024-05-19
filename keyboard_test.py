@@ -14,11 +14,11 @@ import time
 oldflags = (False, False, False)
 counter = 0
 loop_delay = 0.05
+gimbal_pitch = 0
+gimbal_yaw = 0
 while True:
     chassis_vy = 0
     chassis_vx = 0
-    gimbal_pitch = 0
-    gimbal_yaw = 0
 
     if keyboard.is_pressed('s'):
         chassis_vy = -0.3
