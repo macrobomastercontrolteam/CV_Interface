@@ -109,7 +109,6 @@ class CvCmdHandler:
         self.chassis_cmd_speed_y = 0
         self.chassis_speed_x = 0
         self.chassis_speed_y = 0
-        self.target_depth = None
         self.Rx_State = self.eRxState.RX_STATE_INIT
         self.prev_Rx_State = self.Rx_State
         try:
