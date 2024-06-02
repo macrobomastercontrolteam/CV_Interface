@@ -13,7 +13,8 @@ class CvCmdHandler:
     DATA_PAYLOAD_INDEX = 5
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
     MIN_INFO_REQ_SEPARATION_SEC = 1
-    SHOOT_TIMEOUT_SEC = 2
+    # Note: for better performance, shoot timeout in cv board must be smaller than the timeout in control board
+    SHOOT_TIMEOUT_SEC = 0.5
     DEBUG_CV = True
 
     class eMsgType(Enum):
