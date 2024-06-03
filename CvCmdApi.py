@@ -43,6 +43,7 @@ class CvCmdHandler:
     class eInfoBits(Enum):
         MODE_TRAN_DELTA_BIT = 0b00000001
         MODE_CV_SYNC_TIME_BIT = 0b00000010
+        MODE_REF_STATUS_BIT = 0b00000100
 
     def __init__(self, serial_port):
         self.ackMsgInfo = {"reqCtrlTimestamp": -1, "reqRxTimestamp": -1}
@@ -99,7 +100,8 @@ class CvCmdHandler:
         self.infoRequestPending = 0
         self.prevTxTime = 0
         self.prevInfoReqTime = 0
-        self.cvCmdCount = 0
+        self.refStatusUpdateTime = 0
+        # self.cvCmdCount = 0
         self.tranDelta = None  # Transmission delay time in ms
         self.AutoAimSwitch = False
         self.AutoMoveSwitch = False
@@ -112,6 +114,9 @@ class CvCmdHandler:
         self.chassis_speed_y = 0
         self.Rx_State = self.eRxState.RX_STATE_INIT
         self.prev_Rx_State = self.Rx_State
+        self.time_remain = 0
+        self.current_HP = 0
+        self.game_progress = 0
         try:
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
@@ -127,7 +132,12 @@ class CvCmdHandler:
         fRxFinished = False
         while fRxFinished == False:
             fRxFinished = self.CvCmd_RxHeartbeat()
-        return (self.AutoAimSwitch, self.AutoMoveSwitch, self.EnemySwitch)
+        return (self.AutoAimSwitch, self.AutoMoveSwitch, self.EnemySwitch, self.game_progress, self.time_remain, self.current_HP)
+    
+    def CvCmd_InfoReqManager(self):
+        if (time.time() - self.refStatusUpdateTime >= 0.1):
+            self.infoRequestPending |= self.eInfoBits.MODE_REF_STATUS_BIT.value
+            self.refStatusUpdateTime = time.time()
 
     def CvCmd_ConditionSignals(self, gimbal_pitch_target, gimbal_yaw_target, chassis_speed_x, chassis_speed_y):
         if self.DEBUG_CV:
@@ -168,7 +178,7 @@ class CvCmdHandler:
                 bytesRead = self.ser.read(self.ser.in_waiting)
                 # @TODO: use regex to search msg by msg instead of processing only the last msg. For now, control board don't have much to send, so it's fine.
                 setModeRequestPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
-                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + self.eSepChar.CHAR_UNUSED.value + b"{13}", bytesRead)
+                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"..." + self.eSepChar.CHAR_UNUSED.value + b"{10}", bytesRead)
                 if self.DEBUG_CV:
                     print("bytesRead: ", bytesRead)
                     print("setModeRequestPackets: ", setModeRequestPackets)
@@ -184,25 +194,30 @@ class CvCmdHandler:
                     # self.ShootSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_SHOOT_BIT.value)
                     self.ackMsgInfo["reqCtrlTimestamp"] = struct.unpack('<H', setModeRequestPackets[-1][self.DATA_TIMESTAMP_INDEX:self.DATA_TIMESTAMP_INDEX+2])[0]
                     self.ackMsgInfo["reqRxTimestamp"] = self.CvCmd_GetUint16Time()
-                    self.cvCmdCount = 0
+                    # self.cvCmdCount = 0
                     self.Rx_State = self.eRxState.RX_STATE_SEND_ACK
                     fRxFinished = False
 
                 if infoFeedbackPackets:
                     for packet in infoFeedbackPackets:
                         rxInfoType = packet[self.DATA_PAYLOAD_INDEX]
-                        rxInfoData = packet[self.DATA_PAYLOAD_INDEX+1:self.DATA_PAYLOAD_INDEX+3]
+                        rxInfoData = packet[self.DATA_PAYLOAD_INDEX+1:]
                         if rxInfoType == self.eInfoBits.MODE_TRAN_DELTA_BIT.value:
                             # Warning: tranDelta is signed
-                            self.tranDelta = struct.unpack('<h', rxInfoData)[0]
+                            self.tranDelta = struct.unpack_from('<h', rxInfoData, 0)[0]
                             self.infoRequestPending &= ~rxInfoType
                             if self.DEBUG_CV:
                                 print("tranDelta: ", self.tranDelta)
                         elif rxInfoType == self.eInfoBits.MODE_CV_SYNC_TIME_BIT.value:
-                            self.CvSyncTime = struct.unpack('<H', rxInfoData)[0]
+                            self.CvSyncTime = struct.unpack_from('<H', rxInfoData, 0)[0]
                             self.infoRequestPending &= ~rxInfoType
                             if self.DEBUG_CV:
-                                print("CvSyncTime: ", self.CvSyncTime)
+                                print("CvSyncTime: ", self.CvSyncTime, self.time_remain,  self.game_progress, self.current_HP)
+                        elif rxInfoType == self.eInfoBits.MODE_REF_STATUS_BIT.value:
+                            (self.game_progress,self.time_remain, self.current_HP) = struct.unpack_from('<BHH', rxInfoData, 0)
+                            self.infoRequestPending &= ~rxInfoType
+                            #if self.DEBUG_CV:
+                            print("RefStatus Req received ", self.game_progress, self.time_remain, self.current_HP)
                     # Do not change Rx_State or fRxFinished
 
                 # No valid msg received, retry connection
@@ -220,7 +235,7 @@ class CvCmdHandler:
                 self.CvCmd_BuildSendTxMsg(self.txAckMsg)
 
                 # Trigger info request in TxHeartbeat
-                self.infoRequestPending |= self.eInfoBits.MODE_TRAN_DELTA_BIT.value | self.eInfoBits.MODE_CV_SYNC_TIME_BIT.value
+                self.infoRequestPending |= self.eInfoBits.MODE_TRAN_DELTA_BIT.value | self.eInfoBits.MODE_CV_SYNC_TIME_BIT.value 
                 self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
             fRxFinished = True
 
@@ -236,9 +251,10 @@ class CvCmdHandler:
             elif ((self.AutoAimSwitch or self.AutoMoveSwitch) and (self.tranDelta != None)):
                 self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_yaw, self.gimbal_cmd_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
                 self.CvCmd_BuildSendTxMsg(self.txCvCmdMsg)
-                self.cvCmdCount += 1
-                if (self.cvCmdCount % 10 == 0):
-                    self.infoRequestPending |= self.eInfoBits.MODE_TRAN_DELTA_BIT.value
+                self.CvCmd_InfoReqManager()
+                # self.cvCmdCount += 1
+                # if (self.cvCmdCount % 10 == 0):
+                #     self.infoRequestPending |= self.eInfoBits.MODE_TRAN_DELTA_BIT.value
 
         # Latching shoot switch logic
         if self.ShootSwitch:
