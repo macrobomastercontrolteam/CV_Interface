@@ -123,6 +123,30 @@ class CvCmdHandler:
         except:
             pass
 
+    # @param[out]: (type uint8_t) 1 means game on, 0 means game off
+    def CvCmd_GetGameProgress(self):
+        return self.game_progress
+
+    # @param[out]: (type uint16_t) time remaining in current game section
+    def CvCmd_GetGameTimeRemain(self):
+        return self.time_remain
+
+    # @param[out]: (type uint16_t) health points remaining
+    def CvCmd_GetCurrentHp(self):
+        return self.current_HP
+
+    # @param[out]: (type uint8_t) auto aim mode on or off
+    def CvCmd_GetAutoAimMode(self):
+        return self.AutoAimSwitch
+
+    # @param[out]: (type uint8_t) auto move mode on or off
+    def CvCmd_GetAutoMoveMode(self):
+        return self.AutoMoveSwitch
+
+    # @param[out]: (type uint8_t) enemy mode on or off
+    def CvCmd_GetEnemyMode(self):
+        return self.EnemySwitch
+    
     # @brief main API function
     # @param[in] chassis_speed_x and chassis_speed_y: type is float; can be positive/negative; will be converted to float (32 bits)
     def CvCmd_Heartbeat(self, gimbal_pitch_target, gimbal_yaw_target, chassis_speed_x, chassis_speed_y):
@@ -132,7 +156,6 @@ class CvCmdHandler:
         fRxFinished = False
         while fRxFinished == False:
             fRxFinished = self.CvCmd_RxHeartbeat()
-        return (self.AutoAimSwitch, self.AutoMoveSwitch, self.EnemySwitch, self.game_progress, self.time_remain, self.current_HP)
     
     def CvCmd_InfoReqManager(self):
         if (time.time() - self.refStatusUpdateTime >= 0.1):
