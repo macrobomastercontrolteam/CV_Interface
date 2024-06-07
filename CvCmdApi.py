@@ -237,7 +237,7 @@ class CvCmdHandler:
                             if self.DEBUG_CV:
                                 print("CvSyncTime: ", self.CvSyncTime, self.time_remain,  self.game_progress, self.current_HP)
                         elif rxInfoType == self.eInfoBits.MODE_REF_STATUS_BIT.value:
-                            (self.game_progress,self.time_remain, self.current_HP) = struct.unpack_from('<BHH', rxInfoData, 0)
+                            (self.game_progress, self.time_remain, self.current_HP) = struct.unpack_from('<BHH', rxInfoData, 0)
                             self.infoRequestPending &= ~rxInfoType
                             #if self.DEBUG_CV:
                             print("RefStatus Req received ", self.game_progress, self.time_remain, self.current_HP)
@@ -258,7 +258,7 @@ class CvCmdHandler:
                 self.CvCmd_BuildSendTxMsg(self.txAckMsg)
 
                 # Trigger info request in TxHeartbeat
-                self.infoRequestPending |= self.eInfoBits.MODE_TRAN_DELTA_BIT.value | self.eInfoBits.MODE_CV_SYNC_TIME_BIT.value 
+                self.infoRequestPending |= self.eInfoBits.MODE_TRAN_DELTA_BIT.value | self.eInfoBits.MODE_CV_SYNC_TIME_BIT.value
                 self.Rx_State = self.eRxState.RX_STATE_WAIT_FOR_PKG
             fRxFinished = True
 
