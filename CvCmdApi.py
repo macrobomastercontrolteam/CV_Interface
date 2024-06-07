@@ -4,7 +4,7 @@ import serial
 import struct
 import re
 import math
-
+import numpy as np
 
 class CvCmdHandler:
     # misc constants
@@ -147,14 +147,14 @@ class CvCmdHandler:
         # TODO: Use parabolic instead of linear trajectory
         # CV positive directions: +x is to the right, +y is downwards
         # angle unit is radian
-        self.gimbal_cmd_pitch = gimbal_pitch_target
-        self.gimbal_cmd_yaw = -gimbal_yaw_target
+        self.gimbal_cmd_pitch = np.float32(gimbal_pitch_target)
+        self.gimbal_cmd_yaw = np.float32(-gimbal_yaw_target)
 
         # Chassis: speed to speed conversion
         # CV positive directions: +x is to the right, +y is upwards
         # Remote controller positive directions: +x is upwards, +y is to the left
-        self.chassis_cmd_speed_x = float(chassis_speed_y)
-        self.chassis_cmd_speed_y = -float(chassis_speed_x)
+        self.chassis_cmd_speed_x = np.float32(chassis_speed_y)
+        self.chassis_cmd_speed_y = -np.float32(chassis_speed_x)
 
     def CvCmd_RxHeartbeat(self):
         fRxFinished = True
