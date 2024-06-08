@@ -45,6 +45,10 @@ class CvCmdHandler:
         MODE_CV_SYNC_TIME_BIT = 0b00000010
         MODE_REF_STATUS_BIT = 0b00000100
 
+    class eTeamColor(Enum):
+        TEAM_COLOR_BLUE = 0
+        TEAM_COLOR_RED = 1
+
     def __init__(self, serial_port):
         self.ackMsgInfo = {"reqCtrlTimestamp": -1, "reqRxTimestamp": -1}
         self.CvSyncTime = 0
@@ -135,6 +139,10 @@ class CvCmdHandler:
     def CvCmd_GetCurrentHp(self):
         return self.current_HP
 
+    # @param[out]: (type uint8_t) refer to eTeamColor for value assignment
+    def CvCmd_GetTeamColor(self):
+        return self.teamColor
+
     # @param[out]: (type uint8_t) auto aim mode on or off
     def CvCmd_GetAutoAimMode(self):
         return self.AutoAimSwitch
@@ -201,7 +209,7 @@ class CvCmdHandler:
                 bytesRead = self.ser.read(self.ser.in_waiting)
                 # @TODO: use regex to search msg by msg instead of processing only the last msg. For now, control board don't have much to send, so it's fine.
                 setModeRequestPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
-                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"..." + self.eSepChar.CHAR_UNUSED.value + b"{10}", bytesRead)
+                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"...." + self.eSepChar.CHAR_UNUSED.value + b"{9}", bytesRead)
                 if self.DEBUG_CV:
                     print("bytesRead: ", bytesRead)
                     print("setModeRequestPackets: ", setModeRequestPackets)
@@ -235,12 +243,12 @@ class CvCmdHandler:
                             self.CvSyncTime = struct.unpack_from('<H', rxInfoData, 0)[0]
                             self.infoRequestPending &= ~rxInfoType
                             if self.DEBUG_CV:
-                                print("CvSyncTime: ", self.CvSyncTime, self.time_remain,  self.game_progress, self.current_HP)
+                                print("CvSyncTime: ", self.CvSyncTime)
                         elif rxInfoType == self.eInfoBits.MODE_REF_STATUS_BIT.value:
-                            (self.game_progress, self.time_remain, self.current_HP) = struct.unpack_from('<BHH', rxInfoData, 0)
+                            (self.game_progress, self.teamColor, self.time_remain, self.current_HP) = struct.unpack_from('<BBHH', rxInfoData, 0)
                             self.infoRequestPending &= ~rxInfoType
-                            #if self.DEBUG_CV:
-                            print("RefStatus Req received ", self.game_progress, self.time_remain, self.current_HP)
+                            if self.DEBUG_CV:
+                                print("RefStatus: ", self.game_progress, self.teamColor, self.time_remain, self.current_HP)
                     # Do not change Rx_State or fRxFinished
 
                 # No valid msg received, retry connection
