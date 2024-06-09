@@ -14,8 +14,8 @@ class CvCmdHandler:
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
     MIN_INFO_REQ_SEPARATION_SEC = 1
     # Note: for better performance, shoot timeout in cv board must be smaller than the timeout in control board
-    SHOOT_TIMEOUT_SEC = 0.5
-    DEBUG_CV = True
+    SHOOT_TIMEOUT_SEC = 0
+    DEBUG_CV = False
 
     class eMsgType(Enum):
         MSG_MODE_CONTROL = b'\x10'
@@ -110,7 +110,6 @@ class CvCmdHandler:
         self.AutoAimSwitch = False
         self.AutoMoveSwitch = False
         self.EnemySwitch = False
-        self.PrevShootSwitch = False
         self.ShootSwitch = False
         self.chassis_cmd_speed_x = 0
         self.chassis_cmd_speed_y = 0
@@ -259,7 +258,7 @@ class CvCmdHandler:
                     fRxFinished = True
 
         elif self.Rx_State == self.eRxState.RX_STATE_SEND_ACK:
-            if (time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC):
+            if (time.time() - self.prevTxTime >= self.MIN_TX_SEPARATION_SEC):
                 # Timestamps
                 self.CvSyncTime = self.CvCmd_GetUint16Time()
                 uiExecDelta = self.CvCmd_GetUint16Delta(self.CvSyncTime, self.ackMsgInfo["reqRxTimestamp"])
@@ -276,7 +275,7 @@ class CvCmdHandler:
 
     def CvCmd_TxHeartbeat(self):
         # Tx: keeping sending cmd to keep control board alive (watchdog timer logic)
-        if (time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC):
+        if (time.time() - self.prevTxTime >= self.MIN_TX_SEPARATION_SEC):
             if self.infoRequestPending and (time.time() - self.prevInfoReqTime > self.MIN_INFO_REQ_SEPARATION_SEC):
                 self.txInfoRequestMsg[self.DATA_PAYLOAD_INDEX] = self.infoRequestPending
                 self.CvCmd_BuildSendTxMsg(self.txInfoRequestMsg)
@@ -291,18 +290,14 @@ class CvCmdHandler:
 
         # Latching shoot switch logic
         if self.ShootSwitch:
-            if self.PrevShootSwitch == False:
-                if time.time() - self.prevTxTime > self.MIN_TX_SEPARATION_SEC:
-                    self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_SHOOT_BIT.value
-                    self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
-                    self.shootStartTime = time.time()
-                    self.PrevShootSwitch = True
+            if time.time() - self.prevTxTime >= self.MIN_TX_SEPARATION_SEC:
+                self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_SHOOT_BIT.value
+                self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
             elif time.time() - self.shootStartTime > self.SHOOT_TIMEOUT_SEC:
                 # control should automatically disable itself as well
-                self.shootStartTime = time.time()
                 self.ShootSwitch = False
-                self.PrevShootSwitch = False
 
     def CvCmd_Shoot(self):
         # ShootSwitch will be automatically disabled after SHOOT_TIMEOUT_SEC
         self.ShootSwitch = True
+        self.shootStartTime = time.time()
