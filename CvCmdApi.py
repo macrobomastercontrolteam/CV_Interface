@@ -293,7 +293,8 @@ class CvCmdHandler:
             if time.time() - self.prevTxTime >= self.MIN_TX_SEPARATION_SEC:
                 self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_SHOOT_BIT.value
                 self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
-            elif time.time() - self.shootStartTime > self.SHOOT_TIMEOUT_SEC:
+
+            if time.time() - self.shootStartTime > self.SHOOT_TIMEOUT_SEC:
                 # control should automatically disable itself as well
                 self.ShootSwitch = False
 
