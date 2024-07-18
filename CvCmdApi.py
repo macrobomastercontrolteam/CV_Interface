@@ -230,7 +230,7 @@ class CvCmdHandler:
                 bytesRead = self.ser.read(self.ser.in_waiting)
                 # @TODO: use regex to search msg by msg instead of processing only the last msg. For now, control board don't have much to send, so it's fine.
                 setModeRequestPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
-                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"...." + self.eSepChar.CHAR_UNUSED.value + b"{9}", bytesRead)
+                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"......" + self.eSepChar.CHAR_UNUSED.value + b"{7}", bytesRead)
                 if self.DEBUG_CV:
                     print("bytesRead: ", bytesRead)
                     print("setModeRequestPackets: ", setModeRequestPackets)
