@@ -12,7 +12,7 @@ class CvCmdHandler:
     DATA_PACKAGE_SIZE = 21  # 2 bytes header, 1 byte msg type, 16 bytes payload
     DATA_PAYLOAD_INDEX = 5
     MIN_TX_SEPARATION_SEC = 0  # reserved for future, currently control board is fast enough
-    MIN_INFO_REQ_SEPARATION_SEC = 1
+    MIN_INFO_REQ_SEPARATION_SEC = 0
     # Note: for better performance, shoot timeout in cv board must be smaller than the timeout in control board
     SHOOT_TIMEOUT_SEC = 0
     DEBUG_CV = False
@@ -44,6 +44,7 @@ class CvCmdHandler:
         MODE_TRAN_DELTA_BIT = 0b00000001
         MODE_CV_SYNC_TIME_BIT = 0b00000010
         MODE_REF_STATUS_BIT = 0b00000100
+        MODE_GIMBAL_ANGLE_BIT = 0b00001000
 
     class eTeamColor(Enum):
         TEAM_COLOR_BLUE = 0
@@ -105,6 +106,7 @@ class CvCmdHandler:
         self.prevTxTime = 0
         self.prevInfoReqTime = 0
         self.refStatusUpdateTime = 0
+        self.gimbalStatusUpdateTime = 0
         # self.cvCmdCount = 0
         self.tranDelta = None  # Transmission delay time in ms
         self.AutoAimSwitch = False
@@ -122,6 +124,8 @@ class CvCmdHandler:
         self.game_progress = 0
         self.teamColor = self.eTeamColor.TEAM_COLOR_BLUE.value
         self.shootStartTime = 0
+        self.gimbal_yaw_angle = 0
+        self.gimbal_pitch_angle = 0
         try:
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
@@ -156,6 +160,14 @@ class CvCmdHandler:
     def CvCmd_GetEnemyMode(self):
         return self.EnemySwitch
     
+    # @param[out]: (type fp32, unit rad) gimbal absolute pitch angle
+    def CvCmd_GetGimbalPitch(self):
+        return self.gimbal_pitch_angle
+    
+    # @param[out]: (type fp32, unit rad) gimbal absolute yaw angle
+    def CvCmd_GetGimbalYaw(self):
+        return self.gimbal_yaw_angle
+    
     # @brief main API function
     # @param[in] chassis_speed_x and chassis_speed_y: type is float; can be positive/negative; will be converted to float (32 bits)
     def CvCmd_Heartbeat(self, gimbal_pitch_target, gimbal_yaw_target, chassis_speed_x, chassis_speed_y):
@@ -167,8 +179,16 @@ class CvCmdHandler:
             fRxFinished = self.CvCmd_RxHeartbeat()
     
     def CvCmd_InfoReqManager(self):
-        if (time.time() - self.refStatusUpdateTime >= 0.1):
+        if ((time.time() - self.gimbalStatusUpdateTime) >= 0.005):
+            self.infoRequestPending |= self.eInfoBits.MODE_GIMBAL_ANGLE_BIT.value
+            if self.DEBUG_CV:
+                print("Angle Update Time Delay", time.time() - self.gimbalStatusUpdateTime)
+            self.gimbalStatusUpdateTime = time.time()
+            
+        if ((time.time() - self.refStatusUpdateTime) >= 0.1):
             self.infoRequestPending |= self.eInfoBits.MODE_REF_STATUS_BIT.value
+            if self.DEBUG_CV:
+                print("Ref Update Time Delay",time.time() - self.refStatusUpdateTime)
             self.refStatusUpdateTime = time.time()
 
     def CvCmd_ConditionSignals(self, gimbal_pitch_target, gimbal_yaw_target, chassis_speed_x, chassis_speed_y):
@@ -250,6 +270,11 @@ class CvCmdHandler:
                             self.infoRequestPending &= ~rxInfoType
                             if self.DEBUG_CV:
                                 print("RefStatus: ", self.game_progress, self.teamColor, self.time_remain, self.current_HP)
+                        elif rxInfoType == self.eInfoBits.MODE_GIMBAL_ANGLE_BIT.value:
+                            (self.gimbal_yaw_angle, self.gimbal_pitch_angle) = struct.unpack_from('<ff', rxInfoData, 0)
+                            self.infoRequestPending &= ~rxInfoType
+                            if self.DEBUG_CV:
+                                print("GimbalAngle: ", self.gimbal_yaw_angle, self.gimbal_pitch_angle)
                     # Do not change Rx_State or fRxFinished
 
                 # No valid msg received, retry connection
