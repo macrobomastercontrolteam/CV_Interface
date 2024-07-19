@@ -34,6 +34,12 @@ while True:
     
     if keyboard.is_pressed('g'):
         CvCmder.CvCmd_Shoot()
+        
+    if keyboard.is_pressed('c'):
+        CvCmder.CvCmd_Chassis_Spinning(True)
+    
+    else:
+        CvCmder.CvCmd_Chassis_Spinning(False)
 
     CvCmder.CvCmd_Heartbeat(gimbal_pitch_target=gimbal_pitch, gimbal_yaw_target=gimbal_yaw, chassis_speed_x=chassis_vx, chassis_speed_y=chassis_vy)
     # Warning: for python version less than 3.11 running on Windows, the min achieveable sleep time is around 15ms. Test yourself before using time.sleep()

@@ -39,6 +39,7 @@ class CvCmdHandler:
         MODE_AUTO_MOVE_BIT = 0b00000010
         MODE_ENEMY_DETECTED_BIT = 0b00000100
         MODE_SHOOT_BIT = 0b00001000
+        MODE_CHASSIS_SPINNING_BIT = 0b00010000
 
     class eInfoBits(Enum):
         MODE_TRAN_DELTA_BIT = 0b00000001
@@ -113,6 +114,7 @@ class CvCmdHandler:
         self.AutoMoveSwitch = False
         self.EnemySwitch = False
         self.ShootSwitch = False
+        self.ChassisSpinningSwitch = False
         self.chassis_cmd_speed_x = 0
         self.chassis_cmd_speed_y = 0
         self.chassis_speed_x = 0
@@ -126,6 +128,7 @@ class CvCmdHandler:
         self.shootStartTime = 0
         self.gimbal_yaw_angle = 0
         self.gimbal_pitch_angle = 0
+        self.prevChassisSpinningSwitch = False
         try:
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
@@ -160,6 +163,14 @@ class CvCmdHandler:
     def CvCmd_GetEnemyMode(self):
         return self.EnemySwitch
     
+    def CvCmd_Shoot(self):
+        # ShootSwitch will be automatically disabled after SHOOT_TIMEOUT_SEC
+        self.ShootSwitch = True
+        self.shootStartTime = time.time()
+    
+    def CvCmd_Chassis_Spinning(self, spinningSwitch):
+        self.ChassisSpinningSwitch = spinningSwitch
+
     # @param[out]: (type fp32, unit rad) gimbal absolute pitch angle
     def CvCmd_GetGimbalPitch(self):
         return self.gimbal_pitch_angle
@@ -306,6 +317,12 @@ class CvCmdHandler:
                 self.txInfoRequestMsg[self.DATA_PAYLOAD_INDEX] = self.infoRequestPending
                 self.CvCmd_BuildSendTxMsg(self.txInfoRequestMsg)
                 self.prevInfoReqTime = time.time()
+            elif self.ChassisSpinningSwitch != self.prevChassisSpinningSwitch:
+                self.prevChassisSpinningSwitch = self.ChassisSpinningSwitch
+                if self.prevChassisSpinningSwitch:
+                    print("Auto spinning on")
+                    self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value
+                    self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
             elif ((self.AutoAimSwitch or self.AutoMoveSwitch) and (self.tranDelta != None)):
                 self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_yaw, self.gimbal_cmd_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
                 self.CvCmd_BuildSendTxMsg(self.txCvCmdMsg)
@@ -323,8 +340,3 @@ class CvCmdHandler:
             if time.time() - self.shootStartTime > self.SHOOT_TIMEOUT_SEC:
                 # control should automatically disable itself as well
                 self.ShootSwitch = False
-
-    def CvCmd_Shoot(self):
-        # ShootSwitch will be automatically disabled after SHOOT_TIMEOUT_SEC
-        self.ShootSwitch = True
-        self.shootStartTime = time.time()
