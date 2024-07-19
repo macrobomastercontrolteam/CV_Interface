@@ -166,7 +166,8 @@ class CvCmdHandler:
     
     # @param[out]: (type fp32, unit rad) gimbal absolute yaw angle
     def CvCmd_GetGimbalYaw(self):
-        return self.gimbal_yaw_angle
+        # Yaw angles from cv and control board are negative to each other, as used in CvCmd_ConditionSignals
+        return -self.gimbal_yaw_angle
     
     # @brief main API function
     # @param[in] chassis_speed_x and chassis_speed_y: type is float; can be positive/negative; will be converted to float (32 bits)
