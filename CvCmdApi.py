@@ -82,6 +82,14 @@ class CvCmdHandler:
         unsignedDelta = signedDelta if (signedDelta >= 0) else (signedDelta + (1 << 16))
         return unsignedDelta
 
+    def CvCmd_BuildCvControlledTxSetModeMsg(self):
+        self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = 0
+        if self.ShootSwitch:
+            self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] |= self.eModeControlBits.MODE_SHOOT_BIT.value
+
+        if self.ChassisSpinningSwitch:
+            self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] |= self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value
+
     def CvCmd_BuildSendTxMsg(self, txMsg):
         txMsg[self.DATA_TIMESTAMP_INDEX:self.DATA_TIMESTAMP_INDEX+2] = struct.pack('<H', self.CvCmd_GetUint16Delta(self.CvCmd_GetUint16Time(), self.CvSyncTime))
         self.ser.write(txMsg)
@@ -115,6 +123,7 @@ class CvCmdHandler:
         self.EnemySwitch = False
         self.ShootSwitch = False
         self.ChassisSpinningSwitch = False
+        self.prevChassisSpinningSwitch = False
         self.chassis_cmd_speed_x = 0
         self.chassis_cmd_speed_y = 0
         self.chassis_speed_x = 0
@@ -128,7 +137,6 @@ class CvCmdHandler:
         self.shootStartTime = 0
         self.gimbal_yaw_angle = 0
         self.gimbal_pitch_angle = 0
-        self.prevChassisSpinningSwitch = False
         try:
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
@@ -251,11 +259,14 @@ class CvCmdHandler:
                 if setModeRequestPackets:
                     # read the mode of the last packet, because it's the latest
                     rxSwitchBuffer = setModeRequestPackets[-1][self.DATA_PAYLOAD_INDEX]
+
                     self.AutoAimSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_AIM_BIT.value)
                     self.AutoMoveSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_AUTO_MOVE_BIT.value)
                     self.EnemySwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_ENEMY_DETECTED_BIT.value)
-                    # Shoot switch is controlled by CV
+                    # The following switches are controlled by CV
                     # self.ShootSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_SHOOT_BIT.value)
+                    # self.ChassisSpinningSwitch = bool(rxSwitchBuffer & self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value)
+
                     self.ackMsgInfo["reqCtrlTimestamp"] = struct.unpack('<H', setModeRequestPackets[-1][self.DATA_TIMESTAMP_INDEX:self.DATA_TIMESTAMP_INDEX+2])[0]
                     self.ackMsgInfo["reqRxTimestamp"] = self.CvCmd_GetUint16Time()
                     # self.cvCmdCount = 0
@@ -319,11 +330,7 @@ class CvCmdHandler:
                 self.prevInfoReqTime = time.time()
             elif self.ChassisSpinningSwitch != self.prevChassisSpinningSwitch:
                 self.prevChassisSpinningSwitch = self.ChassisSpinningSwitch
-                if self.prevChassisSpinningSwitch:
-                    self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value
-                else:
-                    self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value & 0b11101111
-
+                self.CvCmd_BuildCvControlledTxSetModeMsg()
                 self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
                 if self.DEBUG_CV:
                     print("Auto spinning " + ("on" if self.prevChassisSpinningSwitch else "off"))
@@ -338,7 +345,7 @@ class CvCmdHandler:
         # Latching shoot switch logic
         if self.ShootSwitch:
             if time.time() - self.prevTxTime >= self.MIN_TX_SEPARATION_SEC:
-                self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_SHOOT_BIT.value
+                self.CvCmd_BuildCvControlledTxSetModeMsg()
                 self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
 
             if time.time() - self.shootStartTime > self.SHOOT_TIMEOUT_SEC:
