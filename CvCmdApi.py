@@ -320,15 +320,13 @@ class CvCmdHandler:
             elif self.ChassisSpinningSwitch != self.prevChassisSpinningSwitch:
                 self.prevChassisSpinningSwitch = self.ChassisSpinningSwitch
                 if self.prevChassisSpinningSwitch:
-                    if self.DEBUG_CV:
-                        print("Auto spinning on")
                     self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value
-                    self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
                 else:
                     self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] = self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value & 0b11101111
-                    self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
-                    if self.DEBUG_CV:
-                        print("Auto spinning off")
+
+                self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
+                if self.DEBUG_CV:
+                    print("Auto spinning " + ("on" if self.prevChassisSpinningSwitch else "off"))
             elif ((self.AutoAimSwitch or self.AutoMoveSwitch) and (self.tranDelta != None)):
                 self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_yaw, self.gimbal_cmd_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
                 self.CvCmd_BuildSendTxMsg(self.txCvCmdMsg)
