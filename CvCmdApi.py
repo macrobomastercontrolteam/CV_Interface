@@ -163,12 +163,12 @@ class CvCmdHandler:
     def CvCmd_GetEnemyMode(self):
         return self.EnemySwitch
     
-    def CvCmd_Shoot(self):
+    def CvCmd_StartShoot(self):
         # ShootSwitch will be automatically disabled after SHOOT_TIMEOUT_SEC
         self.ShootSwitch = True
         self.shootStartTime = time.time()
     
-    def CvCmd_Chassis_Spinning(self, spinningSwitch):
+    def CvCmd_SetChassisSpinningSwitch(self, spinningSwitch):
         self.ChassisSpinningSwitch = spinningSwitch
 
     # @param[out]: (type fp32, unit rad) gimbal absolute pitch angle
