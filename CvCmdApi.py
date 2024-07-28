@@ -137,6 +137,8 @@ class CvCmdHandler:
         self.shootStartTime = 0
         self.gimbal_yaw_angle = 0
         self.gimbal_pitch_angle = 0
+        self.RedOutpostHP = 0
+        self.BlueOutpostHP = 0
         try:
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
@@ -256,7 +258,7 @@ class CvCmdHandler:
                 bytesRead = self.ser.read(self.ser.in_waiting)
                 # @TODO: use regex to search msg by msg instead of processing only the last msg. For now, control board don't have much to send, so it's fine.
                 setModeRequestPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
-                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"......." + self.eSepChar.CHAR_UNUSED.value + b"{3}", bytesRead)
+                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b".........." + self.eSepChar.CHAR_UNUSED.value + b"{3}", bytesRead)
                 if self.DEBUG_CV:
                     print("bytesRead: ", bytesRead)
                     print("setModeRequestPackets: ", setModeRequestPackets)
@@ -295,7 +297,7 @@ class CvCmdHandler:
                             if self.DEBUG_CV:
                                 print("CvSyncTime: ", self.CvSyncTime)
                         elif rxInfoType == self.eInfoBits.MODE_REF_STATUS_BIT.value:
-                            (self.game_progress, self.teamColor, self.time_remain, self.current_HP) = struct.unpack_from('<BBHHHH', rxInfoData, 0)
+                            (self.game_progress, self.teamColor, self.time_remain, self.current_HP, self.RedOutpostHP, self.BlueOutpostHP) = struct.unpack_from('<BBHHHH', rxInfoData, 0)
                             self.infoRequestPending &= ~rxInfoType
                             if self.DEBUG_CV:
                                 print("RefStatus: ", self.game_progress, self.teamColor, self.time_remain, self.current_HP, self.RedOutpostHP, self.BlueOutpostHP)
