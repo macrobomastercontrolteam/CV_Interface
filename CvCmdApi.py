@@ -171,6 +171,12 @@ class CvCmdHandler:
     def CvCmd_GetEnemyMode(self):
         return self.EnemySwitch
     
+    def CvCmd_RedOutpostHP(self):
+        return self.RedOutpostHP
+    
+    def CvCmd_BlueOutposeHP(self):
+        return self.BlueOutpostHP
+    
     def CvCmd_StartShoot(self):
         # ShootSwitch will be automatically disabled after SHOOT_TIMEOUT_SEC
         self.ShootSwitch = True
@@ -250,7 +256,7 @@ class CvCmdHandler:
                 bytesRead = self.ser.read(self.ser.in_waiting)
                 # @TODO: use regex to search msg by msg instead of processing only the last msg. For now, control board don't have much to send, so it's fine.
                 setModeRequestPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_MODE_CONTROL.value + b"." + self.eSepChar.CHAR_UNUSED.value + b"{15}", bytesRead)
-                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"......" + self.eSepChar.CHAR_UNUSED.value + b"{7}", bytesRead)
+                infoFeedbackPackets = re.findall(self.eSepChar.CHAR_HEADER.value + b".." + self.eMsgType.MSG_INFO_FEEDBACK.value + b"." + b".." + b"......." + self.eSepChar.CHAR_UNUSED.value + b"{3}", bytesRead)
                 if self.DEBUG_CV:
                     print("bytesRead: ", bytesRead)
                     print("setModeRequestPackets: ", setModeRequestPackets)
@@ -289,10 +295,10 @@ class CvCmdHandler:
                             if self.DEBUG_CV:
                                 print("CvSyncTime: ", self.CvSyncTime)
                         elif rxInfoType == self.eInfoBits.MODE_REF_STATUS_BIT.value:
-                            (self.game_progress, self.teamColor, self.time_remain, self.current_HP) = struct.unpack_from('<BBHH', rxInfoData, 0)
+                            (self.game_progress, self.teamColor, self.time_remain, self.current_HP) = struct.unpack_from('<BBHHHH', rxInfoData, 0)
                             self.infoRequestPending &= ~rxInfoType
                             if self.DEBUG_CV:
-                                print("RefStatus: ", self.game_progress, self.teamColor, self.time_remain, self.current_HP)
+                                print("RefStatus: ", self.game_progress, self.teamColor, self.time_remain, self.current_HP, self.RedOutpostHP, self.BlueOutpostHP)
                         elif rxInfoType == self.eInfoBits.MODE_GIMBAL_ANGLE_BIT.value:
                             (self.gimbal_yaw_angle, self.gimbal_pitch_angle) = struct.unpack_from('<ff', rxInfoData, 0)
                             self.infoRequestPending &= ~rxInfoType
