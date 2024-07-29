@@ -173,10 +173,10 @@ class CvCmdHandler:
     def CvCmd_GetEnemyMode(self):
         return self.EnemySwitch
     
-    def CvCmd_RedOutpostHP(self):
+    def CvCmd_GetRedOutpostHP(self):
         return self.RedOutpostHP
     
-    def CvCmd_BlueOutposeHP(self):
+    def CvCmd_GetBlueOutposeHP(self):
         return self.BlueOutpostHP
     
     def CvCmd_StartShoot(self):
