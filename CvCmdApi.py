@@ -176,7 +176,7 @@ class CvCmdHandler:
     def CvCmd_GetRedOutpostHP(self):
         return self.RedOutpostHP
     
-    def CvCmd_GetBlueOutposeHP(self):
+    def CvCmd_GetBlueOutpostHP(self):
         return self.BlueOutpostHP
     
     def CvCmd_StartShoot(self):
