@@ -128,8 +128,8 @@ class CvCmdHandler:
         self.ShootSwitch = False
         self.ChassisSpinningSwitch = False
         self.prevChassisSpinningSwitch = False
-        self.ChassisAbsAngle = False
-        self.prevChassisAbsAngle = False
+        self.ChassisAbsAngleSwitch = False
+        self.prevChassisAbsAngleSwitch = False
         self.chassis_cmd_speed_x = 0
         self.chassis_cmd_speed_y = 0
         self.chassis_speed_x = 0
