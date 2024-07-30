@@ -40,6 +40,7 @@ class CvCmdHandler:
         MODE_ENEMY_DETECTED_BIT = 0b00000100
         MODE_SHOOT_BIT = 0b00001000
         MODE_CHASSIS_SPINNING_BIT = 0b00010000
+        MODE_CHASSIS_ABS_ANGLE_BIT = 0b00100000
 
     class eInfoBits(Enum):
         MODE_TRAN_DELTA_BIT = 0b00000001
@@ -89,6 +90,9 @@ class CvCmdHandler:
 
         if self.ChassisSpinningSwitch:
             self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] |= self.eModeControlBits.MODE_CHASSIS_SPINNING_BIT.value
+            
+        if self.ChassisAbsAngleSwitch:
+            self.txSetModeMsg[self.DATA_PAYLOAD_INDEX] |= self.eModeControlBits.MODE_CHASSIS_ABS_ANGLE_BIT.value
 
     def CvCmd_BuildSendTxMsg(self, txMsg):
         txMsg[self.DATA_TIMESTAMP_INDEX:self.DATA_TIMESTAMP_INDEX+2] = struct.pack('<H', self.CvCmd_GetUint16Delta(self.CvCmd_GetUint16Time(), self.CvSyncTime))
@@ -124,6 +128,8 @@ class CvCmdHandler:
         self.ShootSwitch = False
         self.ChassisSpinningSwitch = False
         self.prevChassisSpinningSwitch = False
+        self.ChassisAbsAngle = False
+        self.prevChassisAbsAngle = False
         self.chassis_cmd_speed_x = 0
         self.chassis_cmd_speed_y = 0
         self.chassis_speed_x = 0
@@ -187,6 +193,8 @@ class CvCmdHandler:
     def CvCmd_SetChassisSpinningSwitch(self, spinningSwitch):
         self.ChassisSpinningSwitch = spinningSwitch
 
+    def CvCmd_SetChassisAbsAngleSwitch(self, absAngleSwitch):
+        self.ChassisAbsAngleSwitch = absAngleSwitch
     # @param[out]: (type fp32, unit rad) gimbal absolute pitch angle
     def CvCmd_GetGimbalPitch(self):
         return self.gimbal_pitch_angle
@@ -342,6 +350,12 @@ class CvCmdHandler:
                 self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
                 if self.DEBUG_CV:
                     print("Auto spinning " + ("on" if self.prevChassisSpinningSwitch else "off"))
+            elif self.ChassisAbsAngleSwitch != self.prevChassisAbsAngleSwitch:
+                self.prevChassisAbsAngleSwitch = self.ChassisAbsAngleSwitch
+                self.CvCmd_BuildCvControlledTxSetModeMsg()
+                self.CvCmd_BuildSendTxMsg(self.txSetModeMsg)
+                if self.DEBUG_CV:
+                    print("Auto spinning " + ("on" if self.prevChassisAbsAngleSwitch else "off"))
             elif ((self.AutoAimSwitch or self.AutoMoveSwitch) and (self.tranDelta != None)):
                 self.txCvCmdMsg[self.DATA_PAYLOAD_INDEX:self.DATA_PAYLOAD_INDEX+16] = struct.pack('<ffff', self.gimbal_cmd_yaw, self.gimbal_cmd_pitch, self.chassis_cmd_speed_x, self.chassis_cmd_speed_y)
                 self.CvCmd_BuildSendTxMsg(self.txCvCmdMsg)
